@@ -1,0 +1,15 @@
+# Nothing under data/ is committed except the provenance manifest.
+#
+# Raw downloads are large and reproducible via `python -m data_prep.download`.
+# interim/ and processed/ are derived from them -- and because the Nesta
+# suitability data is CC BY-NC-SA, committing those derivatives would impose a
+# non-commercial share-alike licence on the repository. Worth an explicit
+# decision before any of it is checked in.
+#
+# MANIFEST.md IS committed: it records the URL, licence, retrieval date and
+# SHA256 of every snapshot, which is what makes a past result reproducible once
+# the upstream files move (Nesta are retiring the suitability dataset).
+raw/*
+!raw/MANIFEST.md
+interim/
+processed/

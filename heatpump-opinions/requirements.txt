@@ -3,3 +3,7 @@ matplotlib
 networkx
 pyyaml
 pillow
+
+# data_prep only -- the simulation itself does not import these
+pandas
+openpyxl
