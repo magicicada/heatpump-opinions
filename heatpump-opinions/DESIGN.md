@@ -63,7 +63,7 @@ Everything below is Open Government Licence.
 | Source | Role |
 |---|---|
 | Census 2021 **TS041** | How many agents per LSOA |
-| Census 2021 **TS054** tenure | Who is a decision-maker at all, and which funding route applies |
+| Census 2021 **TS054** tenure | Which adoption channel a household is in, and which funding route applies |
 | Census 2021 **TS044** accommodation | Capability, varying *per household* |
 | **IMD 2025** income decile | Opportunity |
 | **LSOA population-weighted centroids** | Placement. Not yet downloaded — the one outstanding fetch. |
@@ -100,6 +100,41 @@ capability (dwelling) x opportunity (funding) x motivation x trigger. This is
 what gives `characteristic` something to do — it is currently referenced in
 exactly one line of `agents.py` (the initial-owner draw) and nowhere in
 `dynamics.py`.
+
+### Two adoption channels
+
+Tenure does not simply switch households on and off. It puts them in one of
+two channels with different gates and different clocks.
+
+**Owner-occupiers** (59.8% in Derby, 45.6% in Nottingham) initiate. They must
+pass all five gates, and the trigger is boiler failure, so a demotivated
+household *delays* rather than being lost.
+
+**Social tenants** (25.5% in Nottingham) do not initiate, but they can
+refuse — which reflects the real situation, since social landlords need
+tenant consent for major works in occupied homes. The landlord funds the
+install, handles suitability and sets the timing, so capability, opportunity
+and trigger all fall away and **motivation is the only remaining gate**. This
+makes social housing the sharpest test of the research question rather than
+inert background: it is the population the whole word-of-mouth effect is
+bounded by, it is spatially concentrated on estates where both negative word
+of mouth and correlated installer failure cluster hardest, and it is where a
+fully-subsidised quality top-up would land.
+
+The asymmetry matters. In the social channel a refusal is pure loss — budget
+committed, offer made, declined — so negative word of mouth destroys installs
+one for one, exactly where the subsidy is fullest. In the owner-occupier
+channel it only postpones them. The social channel is also the cleaner policy
+test bed, because install volume is centrally decided rather than emergent.
+
+Refusal should not be driven by motivation alone; disruption, cylinder space
+and trust in the landlord all feed in. Those belong in the refusal
+probability as parameters.
+
+**Private renters** (28.9% in Nottingham) need the same treatment but a
+different landlord incentive — the split-incentive problem means the landlord
+rarely initiates at all. Modelling them as a low-rate landlord channel with
+the same tenant veto is the obvious first cut.
 
 **Motivation is the only fast-moving state.** Capability is fixed over a run,
 opportunity moves slowly. That is the whole reason the dynamics and the
@@ -149,8 +184,10 @@ work chiefly by *decorrelating* failures rather than by reducing them.
   331 LSOAs above 20%. The fully-subsidised off-gas routes barely apply. If a
   genuinely informative second case is ever wanted, it is a rural or off-gas
   district, not another midlands city.
-- **Over half of Nottingham's households are not the decision-maker** (45.6%
-  owner-occupied, against 59.8% in Derby).
+- **Over half of Nottingham's households do not initiate** (45.6%
+  owner-occupied, against 59.8% in Derby) — but under the two-channel model
+  above they can still refuse, so they are active in the dynamics rather than
+  passive recipients.
 
 ## For review
 
