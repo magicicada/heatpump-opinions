@@ -34,8 +34,13 @@ Outputs land in `results/`: `history.npz` (raw arrays), `network.graphml`
      break down each turn: their `broken_down` flag is set, opinion is
      forced to 0, and they're excluded from all further opinion updates —
      so it can never rise again.
-  3. Any household without a heat pump whose opinion has crossed
-     `heatpumps.install_threshold` gets one installed.
+  3. Any household without a heat pump whose opinion has crossed its
+     *effective* install threshold gets one installed. The effective
+     threshold is `install_threshold - characteristic_weight * characteristic`,
+     so higher-characteristic households (more economic capacity) need less
+     opinion before they act on it — the `characteristic` was otherwise only
+     used once, to pick the initial owners, so this brings it back into the
+     ongoing adoption decision instead of leaving it inert after t=0.
 - `heatpump_sim/simulate.py` — orchestrates a run and records full history.
 - `heatpump_sim/visualize.py` — renders the two animations.
 

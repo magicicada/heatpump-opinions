@@ -54,10 +54,17 @@ def opinion_update_step(
 
 
 def installation_step(households: Households, settings: Settings) -> None:
-    """Households without a heat pump whose opinion has crossed the
-    threshold get one installed."""
+    """Households without a heat pump whose opinion has crossed their
+    effective threshold get one installed. The effective threshold is the
+    base install_threshold discounted by characteristic_weight * characteristic,
+    so higher-characteristic (e.g. wealthier) households need less opinion
+    to act on before they can adopt.
+    """
     threshold = settings.get("heatpumps.install_threshold", 0.95)
-    new_installs = ~households.has_heatpump & (households.opinion > threshold)
+    characteristic_weight = settings.get("heatpumps.characteristic_weight", 0.0)
+
+    effective_threshold = threshold - characteristic_weight * households.characteristic
+    new_installs = ~households.has_heatpump & (households.opinion > effective_threshold)
     households.has_heatpump[new_installs] = True
 
 

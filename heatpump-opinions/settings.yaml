@@ -28,7 +28,11 @@ households:
 heatpumps:
   initial_fraction: 0.05     # fraction of households that start with a heat pump
   top_pool_fraction: 0.10    # initial heat pumps are drawn from this top slice by characteristic
-  install_threshold: 0.95    # opinion threshold that triggers a new install
+  install_threshold: 0.95    # base opinion threshold that triggers a new install
+  characteristic_weight: 0.2 # how much a household's characteristic discounts its own
+                              # install threshold (effective_threshold = install_threshold
+                              # - characteristic_weight * characteristic), so higher-
+                              # characteristic households need less opinion to act on
   breakdown_rate: 0.01       # per-timestep probability an owned, working heat pump breaks down
 
 opinions:
