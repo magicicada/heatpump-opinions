@@ -41,6 +41,10 @@ Outputs land in `results/`: `history.npz` (raw arrays), `network.graphml`
      opinion before they act on it — the `characteristic` was otherwise only
      used once, to pick the initial owners, so this brings it back into the
      ongoing adoption decision instead of leaving it inert after t=0.
+     Households with `characteristic` below `characteristic_gate` are
+     structurally excluded regardless: no opinion, however high, lets them
+     adopt. This models a hard barrier (e.g. renting, flats, no financial
+     means) as distinct from the graded discount above.
 - `heatpump_sim/simulate.py` — orchestrates a run and records full history.
 - `heatpump_sim/visualize.py` — renders the two animations.
 

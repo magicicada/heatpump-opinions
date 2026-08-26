@@ -33,6 +33,10 @@ heatpumps:
                               # install threshold (effective_threshold = install_threshold
                               # - characteristic_weight * characteristic), so higher-
                               # characteristic households need less opinion to act on
+  characteristic_gate: 0.15  # households with characteristic below this can never adopt,
+                              # no matter how high their opinion — a hard structural
+                              # barrier (e.g. flat/tenure/no financial means), distinct
+                              # from the graded discount above (set to 0 to disable)
   breakdown_rate: 0.01       # per-timestep probability an owned, working heat pump breaks down
 
 opinions:

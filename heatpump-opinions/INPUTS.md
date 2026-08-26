@@ -31,6 +31,7 @@ The `characteristic` is a single demographic/economic number in [0, 1] per house
 | `top_pool_fraction` | 0.10 | Initial owners are drawn from this top slice by `characteristic` |
 | `install_threshold` | 0.95 | Base opinion level that triggers a new install |
 | `characteristic_weight` | 0.2 | Discounts a household's own install threshold by `characteristic_weight * characteristic` — higher-characteristic households need less opinion to adopt (set to 0 to disable) |
+| `characteristic_gate` | 0.15 | Households with `characteristic` below this can never adopt, regardless of opinion — a hard structural barrier, distinct from the graded discount above (set to 0 to disable) |
 | `breakdown_rate` | 0.01 | Per-turn probability a working heat pump breaks down |
 
 ## opinions

@@ -231,3 +231,9 @@ Icon
 heatpump-opinions/results/
 heatpump-opinions/analysis/sweep_results.npz
 heatpump-opinions/analysis/noise_breakdown_sweep.png
+
+# Word documents
+*.doc
+*.docx
+*.dotx
+*.dotm

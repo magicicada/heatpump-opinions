@@ -59,12 +59,19 @@ def installation_step(households: Households, settings: Settings) -> None:
     base install_threshold discounted by characteristic_weight * characteristic,
     so higher-characteristic (e.g. wealthier) households need less opinion
     to act on before they can adopt.
+
+    Households below characteristic_gate are structurally unable to adopt
+    (e.g. renters, flats, no financial means) — no opinion, however high,
+    lets them cross this. This is a hard cutoff, distinct from the graded
+    discount above.
     """
     threshold = settings.get("heatpumps.install_threshold", 0.95)
     characteristic_weight = settings.get("heatpumps.characteristic_weight", 0.0)
+    characteristic_gate = settings.get("heatpumps.characteristic_gate", 0.0)
 
     effective_threshold = threshold - characteristic_weight * households.characteristic
-    new_installs = ~households.has_heatpump & (households.opinion > effective_threshold)
+    eligible = households.characteristic >= characteristic_gate
+    new_installs = ~households.has_heatpump & eligible & (households.opinion > effective_threshold)
     households.has_heatpump[new_installs] = True
 
 
