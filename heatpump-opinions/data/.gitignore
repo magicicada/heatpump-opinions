@@ -1,0 +1,34 @@
+# Nothing under data/ is committed except the provenance manifest.
+#
+# Raw downloads are large and reproducible via `python -m data_prep.download`.
+# interim/ and processed/ are derived from them -- and because the Nesta
+# suitability data is CC BY-NC-SA, committing those derivatives would impose a
+# non-commercial share-alike licence on the repository. Worth an explicit
+# decision before any of it is checked in.
+#
+# MANIFEST.md IS committed: it records the URL, licence, retrieval date and
+# SHA256 of every snapshot, which is what makes a past result reproducible once
+# the upstream files move (Nesta are retiring the suitability dataset).
+# That decision has now been taken for three files, and only three. They are a
+# few KB each and are committed because DESIGN.md quotes their numbers: a
+# design note whose figures cannot be checked without a large download and a
+# clustering run is not really reviewable. The per-LSOA assignments file stays
+# out -- 33,755 rows is a data release, not evidence for an argument -- and so
+# does lsoa_table.csv, which carries the Nesta columns outright.
+#
+# Licence check on the three: diagnostics and study_towns are functions of
+# Census 2021 and IMD 2025 alone, both OGL. The profiles file is too, with one
+# exception -- its `pct_urban` column comes from `rural_urban_class`, which
+# reaches the table through the Nesta workbook rather than from ONS directly.
+# The underlying rural/urban classification is ONS OGL data that Nesta
+# redistribute, so carrying an aggregate of it should not pull the CC BY-NC-SA
+# share-alike condition across, but that is a judgement rather than a settled
+# reading. Sourcing the classification from ONS directly would remove the
+# question entirely; see the Nesta open question in DESIGN.md.
+raw/*
+!raw/MANIFEST.md
+interim/
+processed/*
+!processed/lsoa_types_profiles.csv
+!processed/lsoa_types_diagnostics.csv
+!processed/lsoa_types_study_towns.csv
