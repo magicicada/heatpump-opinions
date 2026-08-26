@@ -232,8 +232,13 @@ heatpump-opinions/results/
 # Generated world files — deterministic from world_generation.seed and the
 # settings, both of which are tracked, so regenerable with generate_world.py
 heatpump-opinions/worlds/
-heatpump-opinions/analysis/sweep_results.npz
-heatpump-opinions/analysis/noise_breakdown_sweep.png
+# Analysis outputs — the scripts that produce them stay tracked, the
+# figures and data they emit do not
+heatpump-opinions/analysis/*.png
+heatpump-opinions/analysis/*.csv
+heatpump-opinions/analysis/*.npz
+# ...but the committed example worlds are source, not output
+!heatpump-opinions/examples/worlds/*.csv
 
 # Word documents
 *.doc

@@ -13,8 +13,40 @@ python3 generate_world.py --settings settings.yaml   # -> worlds/model_town.csv
 python3 run_simulation.py --settings settings.yaml   # -> results/
 ```
 
-Outputs land in `results/`: `history.npz` (raw arrays), `network.graphml`
-(the social network), and `opinion_animation.gif` / `heatpump_animation.gif`.
+Each run writes to its own subdirectory of `results/`, named after the world
+it ran on, so runs sit side by side instead of overwriting each other:
+
+```
+results/segregated_town/
+    history.npz         raw arrays (opinions, ownership, breakdowns, world attributes)
+    network.graphml     the social network
+    run_info.json       what produced this run — world, seed, parameters, outcome
+    *.gif               animations
+```
+
+Useful flags: `--world <path>` and `--seed <n>` to override the settings for
+one run, `--run-name` to name the output directory, and `--no-animations`
+to skip GIF rendering (which dominates runtime).
+
+```bash
+python3 run_simulation.py --world examples/worlds/mixed_town.csv --no-animations
+```
+
+## Comparing worlds
+
+`analysis/world_comparison_sweep.py` runs two or more worlds across many
+simulation seeds and reports a paired comparison:
+
+```bash
+python3 analysis/world_comparison_sweep.py --seeds 30
+```
+
+It defaults to the `segregated_town` / `mixed_town` pair in
+[`examples/worlds/`](examples/worlds/README.md), which differ only in how
+segregated the town is. Because both hold the same number of households, a
+given seed produces the same initial opinions and the same social network in
+both, so the pairing is tight and the only difference is who lives where.
+Writes a per-run CSV and a summary figure to `analysis/`.
 
 The two stages are deliberately separate: assumptions about *who lives
 where* can be changed, swapped for real data, or swept without touching the
