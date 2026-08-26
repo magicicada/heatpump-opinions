@@ -1,7 +1,10 @@
 # Data
 
-Inputs for the real-geography version of the model, covering **Nottingham
-(E06000018)** and **Derby (E06000015)**.
+Inputs for the data-driven version of the model. Every source is national;
+`build_lsoa_table` writes **Nottingham (E06000018)** and **Derby
+(E06000015)** by default, and `build(study_areas_only=False)` returns all
+33,755 English LSOAs — which is what the LSOA typology in
+`analysis/lsoa_types.py` clusters over.
 
 ```
 data/
@@ -66,9 +69,10 @@ planning tool, so the download URL is expected to break. The snapshot in
   reports rather than microdata and has no small-area breakdown, so it cannot be
   spatially disaggregated to LSOA. It can supply a national distribution
   conditioned on tenure -- a modelling decision that has not been made yet.
-- **Household coordinates.** Needed to place agents and to build a
-  spatially-embedded network. Options are the ONS Postcode Directory (best
-  clustering, ~1 GB) or LSOA population-weighted centroids (small, cruder).
+- ~~**Household coordinates.**~~ No longer needed. Under the stylised-plane
+  design in `DESIGN.md` the model runs on a grid of LSOA *types* rather than
+  on real coordinates, so LSOA population-weighted centroids — previously the
+  one outstanding fetch — are not required.
 - **MCS installation records.** Wanted for seeding initial adopters and for
   validation. Not openly published at postcode level.
 - **ONS small-area income.** Only available at MSOA, and partially redundant

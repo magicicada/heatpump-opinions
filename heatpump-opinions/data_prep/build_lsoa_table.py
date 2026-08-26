@@ -113,7 +113,13 @@ def load_suitability() -> pd.DataFrame:
     return _select(df, SUITABILITY_COLUMNS, "nesta suitability")
 
 
-def build() -> pd.DataFrame:
+def build(*, study_areas_only: bool = True) -> pd.DataFrame:
+    """Join the sources into one LSOA table.
+
+    `study_areas_only=False` keeps all of England. Every source is national --
+    the subset below is the only thing that narrows it -- so this costs nothing
+    extra and is what the LSOA typology in `analysis/lsoa_types.py` clusters on.
+    """
     imd_raw = pd.read_csv(RAW / "imd2025_file7_all_ranks_scores_deciles.csv")
     imd = _select(imd_raw.rename(columns={"LSOA code (2021)": LSOA_CODE}),
                   {k: v for k, v in IMD_COLUMNS.items() if k != "LSOA code (2021)"},
@@ -148,8 +154,9 @@ def build() -> pd.DataFrame:
     )
 
     # --- subset to the study towns -------------------------------------------
-    table["town"] = table["lad_code"].map({v: k for k, v in STUDY_AREAS.items()})
-    table = table[table["town"].notna()].copy()
+    if study_areas_only:
+        table["town"] = table["lad_code"].map({v: k for k, v in STUDY_AREAS.items()})
+        table = table[table["town"].notna()].copy()
 
     # --- collapse tenure and accommodation into the model's categories --------
     # Owner-occupiers and shared owners can decide for themselves. Social renters
@@ -178,12 +185,25 @@ def build() -> pd.DataFrame:
     for column in ("detached", "semi_detached", "terraced", "flats", "caravan"):
         table[f"prop_{column}"] = table[column] / accommodation_total
 
-    _validate(table)
-    return table.sort_values(["town", LSOA_CODE]).reset_index(drop=True)
+    # Nesta's grid capacity is absent for 1,284 England LSOAs (3.8%), in whole
+    # contiguous blocks rather than scattered -- it looks like missing DNO
+    # coverage, not disclosure control. Median garden size is absent for a
+    # further 21 (0.06%), scattered, which is small enough to be unremarkable.
+    # Both study towns are complete on both, so the subset build stays strict
+    # and only the national build exempts them.
+    _validate(table, allow_null=() if study_areas_only
+              else ("grid_capacity_pct", "median_garden_m2"))
+    sort_keys = ["town", LSOA_CODE] if study_areas_only else [LSOA_CODE]
+    return table.sort_values(sort_keys).reset_index(drop=True)
 
 
-def _validate(table: pd.DataFrame) -> None:
-    """Fail loudly on the mistakes that would otherwise pass silently."""
+def _validate(table: pd.DataFrame, *, allow_null: tuple[str, ...] = ()) -> None:
+    """Fail loudly on the mistakes that would otherwise pass silently.
+
+    `allow_null` exempts columns that are genuinely incomplete upstream. Both
+    study towns are fully covered, so the default stays strict; nationally,
+    Nesta's grid capacity is missing for whole areas (see build()).
+    """
     if table.empty:
         raise ValueError("No LSOAs matched the study areas -- check STUDY_AREAS LAD codes.")
 
@@ -212,7 +232,7 @@ def _validate(table: pd.DataFrame) -> None:
             "which is too large to be census disclosure control."
         )
 
-    nulls = table.columns[table.isna().any()].tolist()
+    nulls = [c for c in table.columns[table.isna().any()] if c not in allow_null]
     if nulls:
         raise ValueError(f"Null values present in: {nulls}")
 
