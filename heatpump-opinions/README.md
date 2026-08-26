@@ -5,23 +5,41 @@ social network of households.
 
 ## Run it
 
+The model runs in two stages. Stage one builds a synthetic population and
+writes it to a **world file**; stage two simulates adoption on it.
+
 ```bash
-python3 run_simulation.py --settings settings.yaml
+python3 generate_world.py --settings settings.yaml   # -> worlds/model_town.csv
+python3 run_simulation.py --settings settings.yaml   # -> results/
 ```
 
 Outputs land in `results/`: `history.npz` (raw arrays), `network.graphml`
 (the social network), and `opinion_animation.gif` / `heatpump_animation.gif`.
 
+The two stages are deliberately separate: assumptions about *who lives
+where* can be changed, swapped for real data, or swept without touching the
+adoption dynamics, and every run can be traced back to the exact population
+it used. The world file is the only contract between them — see
+[WORLD_FORMAT.md](WORLD_FORMAT.md). To skip stage one and generate
+households in-process instead, set `households.location_source: generate`.
+
 ## Structure
 
-- `settings.yaml` — every tunable parameter (household count, network type,
-  opinion dynamics rates, thresholds, output paths).
-- `heatpump_sim/agents.py` — generates household locations and a
-  demographic/economic `characteristic` in [0, 1] that's spatially
-  correlated (built from a handful of random Gaussian "hotspots" summed
-  over space, then noised and rescaled). Can instead load
-  locations/characteristics from a CSV (`households.location_source: file`,
-  columns `id,x,y,characteristic`).
+- `settings.yaml` — every tunable parameter for both stages (household
+  count, network type, opinion dynamics rates, thresholds, world
+  generation, output paths).
+- `generate_world.py` / `heatpump_sim/worldgen.py` — **stage one**. Tiles a
+  model town with a grid of LSOA-like cells, assigns each an archetype
+  (distributions over tenure, building type and income decile), draws
+  households inside it and composes their `characteristic` from the drawn
+  attributes. The `world_generation.mixing` knob runs from a clean
+  affluence gradient across the town (`0`) to archetypes scattered at
+  random (`1`) — the "how segregated is this town" axis.
+- `heatpump_sim/world.py` — the world file format: schema, reader, writer,
+  validation. See [WORLD_FORMAT.md](WORLD_FORMAT.md).
+- `heatpump_sim/agents.py` — loads a world file, or (in `generate` mode)
+  synthesises locations and a spatially-correlated `characteristic`
+  directly, then sets initial opinions and heat pump ownership.
 - `heatpump_sim/network.py` — builds the social network. Currently
   supports `preferential_attachment` (Barabási–Albert), `random`
   (Erdős–Rényi), and `small_world` (Watts–Strogatz), selected via

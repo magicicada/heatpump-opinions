@@ -2,7 +2,7 @@
 loop, and record history for visualisation."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import networkx as nx
@@ -22,6 +22,10 @@ class SimulationResult:
     opinion_history: np.ndarray    # (T+1, n)
     heatpump_history: np.ndarray   # (T+1, n) bool
     broken_history: np.ndarray     # (T+1, n) bool
+
+    # Descriptive per-household attributes from the world file, if one was
+    # loaded (tenure, building_type, lsoa_id, ...). Empty otherwise.
+    attributes: dict[str, np.ndarray] = field(default_factory=dict)
 
 
 def run_simulation(settings: Settings) -> SimulationResult:
@@ -54,12 +58,16 @@ def run_simulation(settings: Settings) -> SimulationResult:
         opinion_history=opinion_history,
         heatpump_history=heatpump_history,
         broken_history=broken_history,
+        attributes=households.attributes,
     )
 
 
 def save_results(result: SimulationResult, results_dir: str | Path) -> None:
     results_dir = Path(results_dir)
     results_dir.mkdir(parents=True, exist_ok=True)
+    # World attributes are saved under an attr_ prefix so they never collide
+    # with the simulation's own arrays.
+    attribute_arrays = {f"attr_{name}": values for name, values in result.attributes.items()}
     np.savez(
         results_dir / "history.npz",
         locations=result.locations,
@@ -67,5 +75,6 @@ def save_results(result: SimulationResult, results_dir: str | Path) -> None:
         opinion_history=result.opinion_history,
         heatpump_history=result.heatpump_history,
         broken_history=result.broken_history,
+        **attribute_arrays,
     )
     nx.write_graphml(result.graph, results_dir / "network.graphml")

@@ -1,0 +1,49 @@
+# heatpump-opinions world file, format version 1
+# households: 40
+# generated: 2026-08-26T12:27:23+00:00
+# seed: 1
+# grid: 2x2
+# mixing: 0.3
+# space_size: 1.0x1.0
+# archetypes: deprived_urban, mixed_suburban, affluent_periphery
+id,x,y,characteristic,lsoa_id,lsoa_archetype,income_decile,tenure,building_type
+0,0.155916,0.151597,0.449169,C000,deprived_urban,3,owner_occupied,flat
+1,0.211663,0.226749,0.315056,C000,deprived_urban,4,private_rented,terraced
+2,0.413851,0.067021,0.433578,C000,deprived_urban,1,social_rented,semi_detached
+3,0.204600,0.201556,0.350124,C000,deprived_urban,3,private_rented,terraced
+4,0.274797,0.101728,0.328591,C000,deprived_urban,2,owner_occupied,flat
+5,0.013780,0.131157,0.317129,C000,deprived_urban,3,private_rented,semi_detached
+6,0.376757,0.375182,0.591016,C000,deprived_urban,4,owner_occupied,terraced
+7,0.269072,0.140204,0.217819,C000,deprived_urban,2,social_rented,terraced
+8,0.164866,0.242595,0.314543,C000,deprived_urban,3,private_rented,terraced
+9,0.394214,0.490369,0.082046,C000,deprived_urban,1,private_rented,flat
+10,0.909813,0.235955,0.724647,C001,mixed_suburban,7,owner_occupied,flat
+11,0.841643,0.137024,0.851441,C001,mixed_suburban,7,owner_occupied,semi_detached
+12,0.893548,0.003546,0.302769,C001,mixed_suburban,7,private_rented,flat
+13,0.595808,0.322860,0.458752,C001,mixed_suburban,4,social_rented,semi_detached
+14,0.901182,0.359955,0.330793,C001,mixed_suburban,4,private_rented,semi_detached
+15,0.595662,0.417785,0.567704,C001,mixed_suburban,5,social_rented,semi_detached
+16,0.540776,0.140939,0.425628,C001,mixed_suburban,5,private_rented,terraced
+17,0.927613,0.107609,0.830754,C001,mixed_suburban,7,owner_occupied,semi_detached
+18,0.930642,0.319666,0.525077,C001,mixed_suburban,7,private_rented,semi_detached
+19,0.938269,0.402527,0.783644,C001,mixed_suburban,5,owner_occupied,semi_detached
+20,0.131247,0.905137,0.737670,C002,mixed_suburban,4,owner_occupied,semi_detached
+21,0.210594,0.670897,0.694539,C002,mixed_suburban,6,owner_occupied,semi_detached
+22,0.052961,0.771835,0.546974,C002,mixed_suburban,7,private_rented,terraced
+23,0.316580,0.598148,0.408002,C002,mixed_suburban,4,private_rented,detached
+24,0.190212,0.998071,0.495488,C002,mixed_suburban,4,owner_occupied,flat
+25,0.362647,0.621608,0.488940,C002,mixed_suburban,5,owner_occupied,flat
+26,0.326933,0.628434,0.590024,C002,mixed_suburban,4,owner_occupied,flat
+27,0.215613,0.536595,0.593763,C002,mixed_suburban,5,owner_occupied,terraced
+28,0.433660,0.628902,0.707418,C002,mixed_suburban,5,owner_occupied,detached
+29,0.316068,0.881564,0.722852,C002,mixed_suburban,6,owner_occupied,terraced
+30,0.750178,0.574524,0.800955,C003,affluent_periphery,7,owner_occupied,detached
+31,0.538542,0.982484,0.958034,C003,affluent_periphery,10,owner_occupied,semi_detached
+32,0.744225,0.700818,0.916262,C003,affluent_periphery,9,owner_occupied,detached
+33,0.606415,0.647617,0.627216,C003,affluent_periphery,8,private_rented,semi_detached
+34,0.566348,0.923499,0.771473,C003,affluent_periphery,10,owner_occupied,flat
+35,0.753032,0.562230,0.798101,C003,affluent_periphery,10,social_rented,detached
+36,0.892543,0.866795,0.792989,C003,affluent_periphery,7,owner_occupied,semi_detached
+37,0.647503,0.593912,0.927758,C003,affluent_periphery,9,owner_occupied,detached
+38,0.884386,0.696246,1.000000,C003,affluent_periphery,10,owner_occupied,detached
+39,0.762815,0.615950,0.849789,C003,affluent_periphery,9,owner_occupied,terraced

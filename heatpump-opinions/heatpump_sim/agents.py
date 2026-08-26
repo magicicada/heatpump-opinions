@@ -2,13 +2,13 @@
 initial opinions, and initial heat pump ownership."""
 from __future__ import annotations
 
-import csv
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
 
 from .settings import Settings
+from .world import read_world
 
 
 @dataclass
@@ -20,6 +20,11 @@ class Households:
     opinion: np.ndarray         # (n,) float in [0, 1], opinion of heat pumps
     has_heatpump: np.ndarray    # (n,) bool
     broken_down: np.ndarray     # (n,) bool, True once a heat pump has broken down
+
+    # Descriptive attributes carried over from a loaded world file (tenure,
+    # building type, ...). Empty for generated populations. The dynamics
+    # never read these; they exist so results can be broken down by them.
+    attributes: dict[str, np.ndarray] = field(default_factory=dict)
 
     @property
     def n(self) -> int:
@@ -58,26 +63,31 @@ def _generate_correlated_characteristic(
     return (field - field_min) / (field_max - field_min)
 
 
-def load_households_from_file(path: str | Path) -> tuple[np.ndarray, np.ndarray]:
-    """Read household locations/characteristics from a CSV with columns:
-    id,x,y,characteristic. Returns (locations, characteristic).
-    """
-    locations, characteristic = [], []
-    with open(path, newline="") as f:
-        for row in csv.DictReader(f):
-            locations.append((float(row["x"]), float(row["y"])))
-            characteristic.append(float(row["characteristic"]))
-    return np.array(locations), np.array(characteristic)
-
-
 def initialize_households(settings: Settings, rng: np.random.Generator) -> Households:
     n = settings.get("households.n_households")
     source = settings.get("households.location_source", "generate")
+    attributes: dict[str, np.ndarray] = {}
 
     if source == "file":
         file_path = settings.get("households.households_source_file")
-        locations, characteristic = load_households_from_file(file_path)
-        n = len(locations)
+        if not file_path:
+            raise ValueError(
+                "households.location_source is 'file' but "
+                "households.households_source_file is not set"
+            )
+        if not Path(file_path).exists():
+            raise FileNotFoundError(
+                f"World file {file_path!r} not found. Generate one first:\n"
+                f"    python3 generate_world.py --settings <settings.yaml>\n"
+                f"or set households.location_source to 'generate'."
+            )
+        world = read_world(file_path)
+        locations = world.locations
+        characteristic = world.characteristic
+        attributes = world.attributes
+        # The file is authoritative on population size; n_households is only
+        # consulted when generating.
+        n = world.n
     elif source == "generate":
         space_size = tuple(settings.get("households.space_size", [1.0, 1.0]))
         locations = _generate_locations(n, space_size, rng)
@@ -114,4 +124,5 @@ def initialize_households(settings: Settings, rng: np.random.Generator) -> House
         opinion=opinion,
         has_heatpump=has_heatpump,
         broken_down=broken_down,
+        attributes=attributes,
     )

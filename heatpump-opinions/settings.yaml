@@ -11,11 +11,12 @@ households:
   space_size: [1.0, 1.0]     # width, height of the geographic space
 
   # Where household locations/characteristics come from.
-  # "generate": create them synthetically (see characteristic_field below)
-  # "file": read from households_source_file (see agents.load_households_from_file
-  #         for the expected CSV columns: id,x,y,characteristic)
-  location_source: generate
-  households_source_file: null
+  # "generate": create them synthetically in-process (see characteristic_field)
+  # "file": read a world file produced by generate_world.py — see
+  #         heatpump_sim/world.py for the format (required columns:
+  #         id,x,y,characteristic; descriptive columns carried through)
+  location_source: file
+  households_source_file: worlds/model_town.csv
 
   # Controls the synthetic spatial field used to generate the demographic/
   # economic "characteristic" number (0-1) so that nearby households tend
@@ -48,6 +49,66 @@ opinions:
                                  # tipping: without it, non-owner opinions settle into a
                                  # stable local average and adoption never crosses the
                                  # install threshold — see README for the full explanation)
+
+# ---------------------------------------------------------------------------
+# Stage one: synthetic world generation (generate_world.py). Only read by the
+# generator — the simulation above never looks at this section, it just reads
+# whatever world file it is pointed at.
+# ---------------------------------------------------------------------------
+world_generation:
+  seed: 7
+  n_households: 400
+  space_size: [1.0, 1.0]
+  grid: [4, 4]        # rows, cols of LSOA-like cells tiling the model town
+  mixing: 0.3         # 0 = clean affluence gradient across the grid,
+                      # 1 = archetypes scattered at random. The "how
+                      # segregated is this town" knob; sweep it like any other.
+  output_file: worlds/model_town.csv
+
+  # How the [0, 1] capability number is composed from drawn attributes.
+  capability:
+    weights:           # normalised internally, so only the ratios matter
+      income: 0.5
+      tenure: 0.3
+      building: 0.2
+    noise_std: 0.05    # household-level variation within an archetype
+
+    # PLACEHOLDER SCORES — revisit with Michael before drawing conclusions.
+    # social_rented is genuinely ambiguous here: those households have the
+    # least decision-making power over their own heating, but are also the
+    # explicit target of the fully-funded installation scheme. Which way it
+    # should score depends on whether we are modelling "can choose to
+    # install" or "is likely to end up with one".
+    tenure_scores:
+      owner_occupied: 1.0
+      social_rented: 0.40
+      private_rented: 0.25
+    building_scores:
+      detached: 1.0
+      semi_detached: 0.85
+      terraced: 0.60
+      flat: 0.15
+
+  # PLACEHOLDER ARCHETYPES standing in for real LSOA data (tenure, building
+  # type and income decile by LSOA). Shaped to be replaced wholesale once
+  # that data lands, with no code change. Order here does not matter — they
+  # are sorted by mean income decile when laid out on the grid.
+  archetypes:
+    - name: deprived_urban
+      share: 0.30
+      income_decile_range: [1, 4]
+      tenure_mix:   {social_rented: 0.45, private_rented: 0.30, owner_occupied: 0.25}
+      building_mix: {flat: 0.50, terraced: 0.30, semi_detached: 0.15, detached: 0.05}
+    - name: mixed_suburban
+      share: 0.45
+      income_decile_range: [4, 7]
+      tenure_mix:   {owner_occupied: 0.60, private_rented: 0.25, social_rented: 0.15}
+      building_mix: {semi_detached: 0.40, terraced: 0.30, flat: 0.20, detached: 0.10}
+    - name: affluent_periphery
+      share: 0.25
+      income_decile_range: [7, 10]
+      tenure_mix:   {owner_occupied: 0.85, private_rented: 0.12, social_rented: 0.03}
+      building_mix: {detached: 0.45, semi_detached: 0.35, terraced: 0.15, flat: 0.05}
 
 network:
   type: preferential_attachment   # preferential_attachment | random | small_world
