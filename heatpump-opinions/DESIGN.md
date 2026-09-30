@@ -34,32 +34,54 @@ failures are this correlated and word of mouth decays this slowly") is
 robust to not knowing it, and is more useful to a policy reader anyway.
 
 One diagnostic is worth computing **before any dynamics are run**: the
-fraction of households gated *only* by motivation — those for whom flipping
+fraction of households gated by motivation — those for whom flipping
 motivation flips the outcome and nothing else stands in the way. Adoption
 needs decision right, capability, opportunity, motivation and a trigger all at
-once, and word of mouth acts on motivation alone. That fraction falls straight
-out of the joint distribution in the LSOA table, and if it is small, that is a
-cheap and important finding.
+once, and word of mouth acts on motivation alone. It is computed by
+`analysis/motivation_gated.py`.
 
-It is a bound on the *immediately reachable* population, not on the whole
-effect, and the two-channel model below is why. In the social channel a
-demotivated household is a refusal and a permanent loss, so the fraction is
-the effect. In the owner-occupier channel demotivation delays rather than
-destroys, and since the output is speed of adoption, those delays are inside
-the effect too — they are simply not captured by a static count. Quoting the
-fraction as an upper bound on everything would understate the owner-occupier
-channel.
+There are two such populations, one in each channel where the household
+decides (see Adoption channels below):
 
-The typology below localises the diagnostic but does not contain it. The
-households in question are social tenants in physically suitable dwellings,
-which points at the **social estates — houses** type — but that type holds
-only **33% of England's social renters** (52% across both social types), and
-social renters within it are **5.7% of English households**, against 17.1%
-social renting nationally. So roughly half the population the study is about
-lives outside the two types the plane concentrates it in, and the type's
-household share (14.5%) is not the bound. Computing the fraction properly
-needs the household-level expansion in any case, because it is a within-LSOA
-joint distribution and not an area mean.
+- **Social tenants in houses.** The landlord supplies capability, opportunity
+  and timing, so consent is what remains. A refusal is a permanent loss.
+- **Able-to-pay owner-occupiers in houses.** Every static gate is in place;
+  once the trigger (boiler failure) arrives, motivation decides. The trigger
+  is a matter of time rather than a barrier, so over a run motivation governs
+  both whether and when they adopt. Demotivation delays rather than destroys
+  here — but the output is speed of adoption, so delay is inside the effect.
+
+| | Social tenants in houses | Able-to-pay owners in houses | Total |
+|---|---|---|---|
+| England | 11.8% (5.3–15.5) | 42.3% (31.6–60.1) | **54.1%** (36.9–75.6) |
+| Derby | 14.7% | 41.7% | 56.4% |
+| Nottingham | 18.8% | 25.8% | 44.6% |
+| Social estates — houses | 32.3% | 22.4% | 54.7% |
+| Social flats | 16.0% | 5.4% | 21.4% |
+
+Percentages of households. The Census gives tenure and dwelling type
+separately per LSOA and income deprivation comes from IMD, so the joint counts
+are not observed: the point figures assume independence within each LSOA, and
+the brackets are Fréchet bounds — the full range consistent with the margins,
+no assumption made. Independence probably overstates social tenants in houses
+(they are likelier than their neighbours to live in flats) and understates
+able-to-pay owners (income deprivation concentrates among renters). "Able to
+pay" means not income-deprived on the IMD income score, which is a generous
+proxy: not being on means-tested benefits is a far lower bar than affording a
+heat pump net of the grant.
+
+So the population word of mouth can act on is **not small** — about half of
+England — and the two channels matter in different ways. The social channel is
+smaller but loses installs outright where the subsidy is fullest; the owner
+channel is four times larger and loses time. They should be reported side by
+side, not only summed.
+
+The typology localises the diagnostic but does not contain it. Only **40%** of
+England's social tenants in houses live in the **social estates — houses**
+type; the rest are spread through mixed terraced (18%), owner-occupied semis
+(15%) and suburban detached (14%) areas. So most of the social channel lives
+outside the type the plane concentrates it in, and the type's household share
+is not the bound.
 
 ## Geography: a stylised plane
 
@@ -282,7 +304,7 @@ The typology splits this channel in two, and the split is load-bearing.
 **Social estates — houses** is where the non-motivation gates come closest to
 falling away entirely. **Social flats** carries a comparable social-rented share
 (0.49 against 0.39) but two thirds of the dwellings are flats, so capability
-binds as well and the motivation-only bound does not apply. Treating "social
+binds as well and most of its tenants fall outside the motivation-gated count. Treating "social
 housing" as one population would average across that distinction and overstate
 the reachable effect.
 
@@ -367,18 +389,35 @@ uniform is assumed.
 
 ### Three consequences worth stating before anything is run
 
-**The arrangement sweep may be close to inert.** An LSOA holds ~650 households
-and an urban one is a few hundred metres across. A 210 m decay radius therefore
-places nearly all influence within a cell and its immediate ring, so the
-arrangement of types on the plane can only act through the long-range ties. The
-expected share of edges crossing a cell boundary is computable from the kernel
-and the cell geometry alone, with no dynamics. **Compute it before committing to
-the arrangement sweep** — if it is small, the sweep will produce a flat surface
-and the compute is better spent elsewhere.
+**The arrangement sweep is not inert — checked.** The worry was that a 210 m
+decay radius would keep nearly all influence inside a cell. The share of edges
+crossing a cell boundary is computable from the kernel and the cell geometry
+alone, with no dynamics, and `analysis/edge_crossing.py` computes it.
 
-If that check does come back small, the plane still earns its place, but on a
-narrower claim, and the note should say so rather than quietly keep the wider
-one. Two of the three things the plane buys survive an inert arrangement axis:
+Cell size comes from the data: LSOA areas (households divided by Nesta's
+property density, which sum to England's 130,311 km²) give a median urban cell
+side of **~600 m** (interquartile 490–800 m; social flats ~450 m). The kernel's
+mean edge length at lambda = 210 m is ~400 m — comparable to a cell, not small
+against it. At the central values (600 m cells, lambda 210 m, long-range
+fraction 0.30), **58% of local edges cross into another cell**, almost all into
+an adjacent one.
+
+Which edges can feel the arrangement needs stating carefully, because an
+earlier draft of this note had it backwards. Long-range edges go to uniformly
+random targets, so the type they land in follows the plane's overall mix
+*whatever the arrangement* — they are blind to it. Only local edges that cross
+into a neighbouring cell connect a household to a neighbour whose type the
+arrangement sets. The **arrangement-sensitive share** is therefore
+`(1 - p) x local crossing share`: **41%** at the central values, and 13–78%
+across the swept ranges (23% even at lambda = 100 m). The sweep axis is live.
+
+Simplifications behind those figures: households are spread uniformly, cells
+are square and equal-area, and the plane has hard edges. Density comes from
+the Nesta workbook; ONS LSOA boundaries (OGL) would give the same areas.
+
+Had the check come back small, the plane would still have earned its place,
+but on a narrower claim, and the note should have said so rather than quietly
+kept the wider one. Two of the three things the plane buys survive an inert arrangement axis:
 sampling real LSOAs preserves the empirical joint distribution of tenure,
 dwelling and income without anyone having to model those correlations, and
 failure correlation still clusters *within* cells, which is the mechanism the
@@ -474,8 +513,8 @@ discover them as contradictions.
 | Does the kernel's normalisation remove the density-degree confound? | **No.** A global normalisation sets the population *mean* degree; it does not stop a household in a denser cell having more neighbours within 210 m. Only per-household normalisation would, and that is *k*-NN in disguise. The confound is declared, not dissolved. |
 | Two adoption channels or three? | **Three.** Private renters are a fifth of England; a two-channel framing left them unaccounted for. |
 | Is motivation the *only* gate for social tenants? | **Dominant, not sole.** Disruption, cylinder space and trust in the landlord sit in the refusal probability alongside it. |
-| Does the motivation-only fraction bound the whole effect? | **No** — it bounds the immediately reachable population. Owner-occupier delay is inside the outcome but outside a static count. |
-| What if the arrangement sweep turns out inert? | Report the edge-crossing share, reduce the sweep to a two-point check, and retire the segregation claim. Do not widen lambda until the axis moves. |
+| Which households are gated by motivation? | **Both** social tenants in houses **and** able-to-pay owners in houses — one population per channel where the household decides. Reported separately, because one loses installs and the other loses time. |
+| What if the arrangement sweep turns out inert? | Report the edge-crossing share, reduce the sweep to a two-point check, and retire the segregation claim. Do not widen lambda until the axis moves. (Checked: it is not inert — 41% of edges are arrangement-sensitive at central values.) |
 
 Two figures were also corrected: the Nesta-flats correlation is -0.91 across
 England (-0.97 was Derby and Nottingham only), and the 3.50 mean income decile
@@ -484,8 +523,8 @@ describes Nottingham's included LSOAs, not the excluded suburban ring.
 ## For review
 
 1. Stylised plane instead of a real town — is trading the "we simulated
-   Derby" framing for arrangement-as-a-swept-variable the right trade? Note
-   that the trade is contingent on the edge-crossing check above.
+   Derby" framing for arrangement-as-a-swept-variable the right trade? The
+   edge-crossing check it was contingent on has come back in its favour.
 2. Six types, or is the social houses/flats split worth more resolution
    (k=8 separates further but the real-vs-null stability gap narrows to
    +0.07, against +0.16 at k=6)?
