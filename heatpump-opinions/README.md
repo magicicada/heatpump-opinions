@@ -43,9 +43,10 @@ python3 analysis/world_comparison_sweep.py --seeds 30
 
 It defaults to the `segregated_town` / `mixed_town` pair in
 [`examples/worlds/`](examples/worlds/README.md), which differ only in how
-segregated the town is. Because both hold the same number of households, a
-given seed produces the same initial opinions and the same social network in
-both, so the pairing is tight and the only difference is who lives where.
+segregated the town is. Both hold the same number of households at the same
+coordinates, so a given seed produces the same initial opinions and — even
+with the spatial network — the same social network in both. The pairing is
+tight and the only difference is who lives where.
 Writes a per-run CSV and a summary figure to `analysis/`.
 
 The two stages are deliberately separate: assumptions about *who lives
@@ -64,7 +65,11 @@ households in-process instead, set `households.location_source: generate`.
   model town with a grid of LSOA-like cells, assigns each an archetype
   (distributions over tenure, building type and income decile), draws
   households inside it and composes their `characteristic` from the drawn
-  attributes. The `world_generation.mixing` knob runs from a clean
+  attributes. Cells hold `world_generation.households_per_cell` households
+  (694 by default, the mean for an English LSOA), so the default world has
+  11,104 households; the small committed examples are for reading and
+  quick tests, not results — see
+  [`examples/worlds/`](examples/worlds/README.md). The `world_generation.mixing` knob runs from a clean
   affluence gradient across the town (`0`) to archetypes scattered at
   random (`1`) — the "how segregated is this town" axis.
 - `heatpump_sim/world.py` — the world file format: schema, reader, writer,
@@ -72,10 +77,21 @@ households in-process instead, set `households.location_source: generate`.
 - `heatpump_sim/agents.py` — loads a world file, or (in `generate` mode)
   synthesises locations and a spatially-correlated `characteristic`
   directly, then sets initial opinions and heat pump ownership.
-- `heatpump_sim/network.py` — builds the social network. Currently
-  supports `preferential_attachment` (Barabási–Albert), `random`
-  (Erdős–Rényi), and `small_world` (Watts–Strogatz), selected via
-  `network.type`.
+- `heatpump_sim/network.py` — builds the social network, selected via
+  `network.type`. The default, `spatial_kernel`, follows the network
+  review in the 26 Aug briefing: a local tie between two households forms
+  with probability proportional to `exp(-distance / decay_length_m)`,
+  scaled so households average `mean_degree` ties, and a further
+  `long_range_fraction` of ties are placed ignoring geography. Each edge is
+  tagged `kind: local` or `kind: long`. World coordinates are converted to
+  metres with `metres_per_unit`, currently a placeholder (2 km town, 500 m
+  cells). A warning is raised if the world is too sparse for the requested
+  degree, in which case the realised decay is flatter than asked for.
+  `preferential_attachment` (Barabási–Albert), `random` (Erdős–Rényi) and
+  `small_world` (Watts–Strogatz) remain available; BA is kept only as an
+  unrealistic comparator. Each run's `run_info.json` records a
+  `network_summary`, including the realised and expected share of ties that
+  cross a cell boundary.
 - `heatpump_sim/dynamics.py` — per-timestep update:
   1. Each household's opinion moves toward its network neighbours' mean
      opinion, plus a steady increase if it owns a working heat pump, plus

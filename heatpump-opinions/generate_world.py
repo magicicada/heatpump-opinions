@@ -26,6 +26,8 @@ def main() -> None:
     # populations can be generated without a bespoke settings file each time.
     parser.add_argument("--seed", type=int, default=None, help="Override world_generation.seed")
     parser.add_argument("--n-households", type=int, default=None, help="Override world_generation.n_households")
+    parser.add_argument("--households-per-cell", type=int, default=None,
+                        help="Override world_generation.households_per_cell")
     parser.add_argument("--mixing", type=float, default=None,
                         help="Override world_generation.mixing (0 = affluence gradient, 1 = random)")
     parser.add_argument("--grid", type=int, nargs=2, metavar=("ROWS", "COLS"), default=None,
@@ -37,10 +39,14 @@ def main() -> None:
     overrides = {
         "seed": args.seed,
         "n_households": args.n_households,
+        "households_per_cell": args.households_per_cell,
         "mixing": args.mixing,
         "grid": args.grid,
     }
     world_cfg = settings.raw.setdefault("world_generation", {})
+    if args.n_households is not None and args.households_per_cell is None:
+        # An explicit total wins over a per-cell size set in the settings file.
+        world_cfg.pop("households_per_cell", None)
     for key, value in overrides.items():
         if value is not None:
             world_cfg[key] = value

@@ -57,7 +57,10 @@ opinions:
 # ---------------------------------------------------------------------------
 world_generation:
   seed: 7
-  n_households: 400
+  n_households: 400          # used only when households_per_cell is unset
+  households_per_cell: 694   # LSOA-sized cells: ~23.4M households in England
+                             # (Census 2021) over 33,755 LSOAs. Set to null to
+                             # fall back to n_households for small test worlds.
   space_size: [1.0, 1.0]
   grid: [4, 4]        # rows, cols of LSOA-like cells tiling the model town
   mixing: 0.3         # 0 = clean affluence gradient across the grid,
@@ -111,11 +114,22 @@ world_generation:
       building_mix: {detached: 0.45, semi_detached: 0.35, terraced: 0.15, flat: 0.05}
 
 network:
-  type: preferential_attachment   # preferential_attachment | random | small_world
+  type: spatial_kernel   # spatial_kernel | preferential_attachment | random | small_world
+  # Central values and sweep ranges from the network review in the 26 Aug
+  # briefing. Local ties form with probability proportional to
+  # exp(-distance / decay_length_m), scaled to hit mean_degree; a further
+  # long_range_fraction of ties are placed ignoring geography.
   params:
-    m: 3            # edges each new node attaches with (Barabasi-Albert)
-    # random:       {p: 0.05}
-    # small_world:  {k: 4, p: 0.1}
+    mean_degree: 15            # swept 5-20; Dunbar sympathy group (an analogue)
+    decay_length_m: 210        # swept 100-500; Barton-Henry et al. 2021 (Fresno solar)
+    long_range_fraction: 0.30  # swept 0.1-0.5; Liben-Nowell et al. 2005
+    metres_per_unit: 2000      # PLACEHOLDER physical scale of the world: 1.0 in world
+                               # coordinates is this many metres. At 2000 the 4x4 town
+                               # is 2 km across with 500 m cells; revisit once real
+                               # LSOA areas are available.
+    # preferential_attachment: {m: 3}  (unrealistic comparator only)
+    # random:                  {p: 0.05}
+    # small_world:             {k: 4, p: 0.1}
 
 output:
   results_dir: results

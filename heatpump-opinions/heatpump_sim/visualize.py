@@ -9,15 +9,25 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 from matplotlib.animation import FuncAnimation, PillowWriter
+from matplotlib.collections import LineCollection
 
 from .simulate import SimulationResult
 
 
 def _draw_network_edges(ax, locations: np.ndarray, graph: nx.Graph) -> None:
-    for u, v in graph.edges():
-        x = [locations[u, 0], locations[v, 0]]
-        y = [locations[u, 1], locations[v, 1]]
-        ax.plot(x, y, color="grey", linewidth=0.4, alpha=0.25, zorder=1)
+    # One LineCollection rather than a plot call per edge: LSOA-scale worlds
+    # have tens of thousands of edges. Edges fade as their number grows so
+    # the plot does not turn solid grey.
+    edges = np.array(list(graph.edges()), dtype=int).reshape(-1, 2)
+    segments = np.stack([locations[edges[:, 0]], locations[edges[:, 1]]], axis=1)
+    alpha = min(0.25, 0.25 * 1000 / max(len(edges), 1))
+    ax.add_collection(LineCollection(segments, colors="grey", linewidths=0.4, alpha=alpha, zorder=1))
+
+
+def _marker_size(n: int) -> float:
+    """Marker area that keeps households distinguishable: 60 up to a few
+    hundred households, shrinking in proportion beyond that."""
+    return min(60.0, 60.0 * 400 / n)
 
 
 def animate_opinions(result: SimulationResult, out_path: str | Path, fps: int = 8) -> None:
@@ -31,9 +41,9 @@ def animate_opinions(result: SimulationResult, out_path: str | Path, fps: int = 
         cmap="RdYlGn",
         vmin=0,
         vmax=1,
-        s=60,
+        s=_marker_size(len(result.locations)),
         edgecolors="black",
-        linewidths=0.4,
+        linewidths=0.4 if len(result.locations) <= 1000 else 0.0,
         zorder=2,
     )
     cbar = fig.colorbar(scatter, ax=ax)
@@ -61,9 +71,9 @@ def animate_heatpumps(result: SimulationResult, out_path: str | Path, fps: int =
         result.locations[:, 0],
         result.locations[:, 1],
         c=colors,
-        s=60,
+        s=_marker_size(len(result.locations)),
         edgecolors="black",
-        linewidths=0.4,
+        linewidths=0.4 if len(result.locations) <= 1000 else 0.0,
         zorder=2,
     )
     title = ax.set_title("Heat pump adoption — t=0")
@@ -100,9 +110,9 @@ def animate_combined(result: SimulationResult, out_path: str | Path, fps: int = 
         cmap="RdYlGn",
         vmin=0,
         vmax=1,
-        s=60,
+        s=_marker_size(len(result.locations)),
         edgecolors="black",
-        linewidths=0.4,
+        linewidths=0.4 if len(result.locations) <= 1000 else 0.0,
         zorder=2,
     )
     cbar = fig.colorbar(op_scatter, ax=ax_op)
@@ -117,9 +127,9 @@ def animate_combined(result: SimulationResult, out_path: str | Path, fps: int = 
         result.locations[:, 0],
         result.locations[:, 1],
         c=hp_colors,
-        s=60,
+        s=_marker_size(len(result.locations)),
         edgecolors="black",
-        linewidths=0.4,
+        linewidths=0.4 if len(result.locations) <= 1000 else 0.0,
         zorder=2,
     )
     hp_title = ax_hp.set_title("Heat pump adoption")

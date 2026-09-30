@@ -33,7 +33,7 @@ def run_simulation(settings: Settings) -> SimulationResult:
     rng = np.random.default_rng(seed)
 
     households = initialize_households(settings, rng)
-    graph = build_network(households.n, settings, rng)
+    graph = build_network(households.locations, settings, rng)
 
     n_steps = settings.get("simulation.num_timesteps", 100)
 

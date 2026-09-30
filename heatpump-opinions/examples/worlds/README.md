@@ -59,3 +59,25 @@ python3 generate_world.py --out examples/worlds/mixed_town.csv       --n-househo
 
 The archetype and capability values these were built from are placeholders
 standing in for real LSOA data — see the warnings in `settings.yaml`.
+
+## LSOA-scale worlds
+
+These examples hold 10–13 households per cell, far fewer than a real LSOA.
+At the default `network.params` the 200-household towns still reach the
+target degree, but only by tying a much larger share of nearby households
+than a real town would; `tiny_demo` is sparse enough that the network
+builder warns the kernel is saturated. For runs meant to be read, use
+LSOA-sized cells (`world_generation.households_per_cell`,
+694 by default: 11,104 households on the 4×4 grid). At ~0.9 MB each these
+are not committed; generate them into the gitignored `worlds/`:
+
+```bash
+python3 generate_world.py --out worlds/model_town.csv
+python3 generate_world.py --out worlds/segregated_town_lsoa.csv --seed 30 --mixing 0.0
+python3 generate_world.py --out worlds/mixed_town_lsoa.csv      --seed 30 --mixing 1.0
+```
+
+The pair again shares coordinates, so it pairs as tightly as the small one.
+Correlation of `characteristic` with position across town is +0.73 for the
+segregated world and +0.09 for the mixed one. A single run takes about 30 s
+with `--no-animations`; rendering the GIFs adds several minutes.

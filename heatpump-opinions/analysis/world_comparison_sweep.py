@@ -6,10 +6,11 @@ which share a generation seed and differ only in `world_generation.mixing`
 — a clean gradient of affluence across the town versus neighbourhoods
 scattered at random.
 
-The comparison is *paired*: both worlds hold 200 households, so for a given
-simulation seed the initial opinion vector and the social network are
-identical between them. The only thing that differs is which household sits
-where, and therefore who is capable of adopting. That makes a paired test
+The comparison is *paired*: both worlds hold 200 households at the same
+coordinates, so for a given simulation seed the initial opinion vector and
+the social network (spatial or not) are identical between them. The only
+thing that differs is which household sits where, and therefore who is
+capable of adopting. That makes a paired test
 appropriate and much more sensitive than comparing the groups independently.
 
 What a p-value means here: these are simulation seeds, not sampled people,
@@ -23,6 +24,7 @@ import argparse
 import copy
 import csv
 import sys
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 import numpy as np
@@ -130,7 +132,13 @@ def main() -> None:
                         help="World files to compare")
     parser.add_argument("--seeds", type=int, default=30, help="Number of simulation seeds per world")
     parser.add_argument("--settings", default=str(PROJECT_ROOT / "settings.yaml"))
+    parser.add_argument("--out-dir", default=str(OUT_DIR),
+                        help="Where to write the CSV, curves and plot (default: analysis/)")
+    parser.add_argument("--jobs", type=int, default=1,
+                        help="Runs to execute in parallel (each LSOA-scale run needs ~1 GB)")
     args = parser.parse_args()
+    out_dir = Path(args.out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     base = yaml.safe_load(open(args.settings))
     worlds = [Path(w) for w in args.worlds]
@@ -141,12 +149,15 @@ def main() -> None:
     rows: list[dict] = []
     curves: dict[str, list[np.ndarray]] = {}
 
-    for world in worlds:
-        print(f"Running {world.stem} across {args.seeds} seeds...")
-        for seed in range(args.seeds):
-            row, curve = run_one(world, seed, base)
+    jobs = [(world, seed) for world in worlds for seed in range(args.seeds)]
+    print(f"Running {len(worlds)} worlds x {args.seeds} seeds ({len(jobs)} runs, {args.jobs} at a time)...")
+    with ProcessPoolExecutor(max_workers=args.jobs) as pool:
+        # map preserves job order, so rows and curves stay grouped by world
+        # and ordered by seed exactly as in a serial run.
+        results = pool.map(run_one, [w for w, _ in jobs], [s for _, s in jobs], [base] * len(jobs))
+        for row, curve in results:
             rows.append(row)
-            curves.setdefault(world.stem, []).append(curve)
+            curves.setdefault(row["world"], []).append(curve)
 
     # Per-run tidy data, for any further analysis.
     all_columns: list[str] = []
@@ -154,13 +165,13 @@ def main() -> None:
         for k in row:
             if k not in all_columns:
                 all_columns.append(k)
-    csv_path = OUT_DIR / "world_comparison.csv"
+    csv_path = out_dir / "world_comparison.csv"
     with open(csv_path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=all_columns)
         writer.writeheader()
         writer.writerows(rows)
 
-    np.savez(OUT_DIR / "world_comparison_curves.npz",
+    np.savez(out_dir / "world_comparison_curves.npz",
              **{name: np.array(c) for name, c in curves.items()})
 
     # ---- summary ----
@@ -192,8 +203,9 @@ def main() -> None:
                     print(f"      ^ fewer than {args.seeds} pairs: this compares timing only among "
                           f"runs that got there.\n"
                           f"        Read it alongside reached_{metric.split('_')[-1]}, which is unbiased.")
-        print("\nPairing is meaningful: both worlds have the same household count, so a\n"
-              "given seed yields the same initial opinions and the same social network.\n"
+        print("\nPairing is meaningful: both worlds have the same households at the same\n"
+              "coordinates, so a given seed yields the same initial opinions and the same\n"
+              "social network.\n"
               "p-values measure only whether the gap exceeds this model's own Monte Carlo\n"
               "noise — not whether it holds for real towns.")
 
@@ -209,12 +221,12 @@ def main() -> None:
                 cells.append(f"{vals.mean():.1%} ± {vals.std(ddof=1):.1%}")
             print(f"  {col.replace('adopt_tenure_', ''):<26}" + "".join(f"{c:>22}" for c in cells))
 
-    plot_path = make_plot(rows, curves, names, tenure_cols)
+    plot_path = make_plot(rows, curves, names, tenure_cols, out_dir)
     print(f"\nPer-run data: {csv_path}")
     print(f"Plot:         {plot_path}")
 
 
-def make_plot(rows, curves, names, tenure_cols) -> Path:
+def make_plot(rows, curves, names, tenure_cols, out_dir: Path) -> Path:
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -271,7 +283,7 @@ def make_plot(rows, curves, names, tenure_cols) -> Path:
         ax3.grid(alpha=0.3, axis="y")
 
     fig.tight_layout()
-    path = OUT_DIR / "world_comparison.png"
+    path = out_dir / "world_comparison.png"
     fig.savefig(path, dpi=140)
     plt.close(fig)
     return path

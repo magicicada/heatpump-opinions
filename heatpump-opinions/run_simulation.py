@@ -13,6 +13,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+from heatpump_sim.network import expected_cross_cell_share, kernel_params, summarise_network
 from heatpump_sim.settings import Settings
 from heatpump_sim.simulate import run_simulation, save_results
 from heatpump_sim.visualize import animate_combined, animate_heatpumps, animate_opinions
@@ -25,6 +26,21 @@ def default_run_name(settings: Settings) -> str:
         if source:
             return Path(source).stem
     return "generated"
+
+
+def network_summary(settings: Settings, result) -> dict:
+    """Structure of the network the run used, including the share of ties
+    crossing an LSOA-like cell boundary when the world records cells."""
+    params = settings.get("network.params", {}) or {}
+    spatial = settings.get("network.type", "spatial_kernel") == "spatial_kernel"
+    metres_per_unit = kernel_params(params)["metres_per_unit"] if spatial else None
+    cell_ids = result.attributes.get("lsoa_id")
+    summary = summarise_network(result.graph, result.locations, cell_ids, metres_per_unit)
+    if spatial and cell_ids is not None:
+        summary["expected_cross_cell_share"] = expected_cross_cell_share(
+            result.locations, cell_ids, params
+        )
+    return summary
 
 
 def write_run_info(path: Path, settings: Settings, result, run_name: str) -> None:
@@ -45,6 +61,7 @@ def write_run_info(path: Path, settings: Settings, result, run_name: str) -> Non
         "heatpumps": settings.get("heatpumps", {}),
         "opinions": settings.get("opinions", {}),
         "network": settings.get("network", {}),
+        "network_summary": network_summary(settings, result),
         "outcome": {
             "final_adopted": int(result.heatpump_history[-1].sum()),
             "final_adoption_fraction": float(result.heatpump_history[-1].mean()),

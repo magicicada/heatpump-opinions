@@ -160,6 +160,12 @@ def generate_world(settings: Settings) -> dict:
 
     rows, cols = grid
     n_cells = rows * cols
+    # households_per_cell, when set, fixes the size of each LSOA-like cell
+    # and takes precedence over n_households, so the grid can be resized
+    # without the cells thinning out.
+    households_per_cell = settings.get("world_generation.households_per_cell")
+    if households_per_cell is not None:
+        n_households = n_cells * int(households_per_cell)
     if n_cells > n_households:
         raise ValueError(
             f"grid has {n_cells} cells but only {n_households} households — "
