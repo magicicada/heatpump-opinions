@@ -1,0 +1,116 @@
+[
+ {
+  "name": "t0_mixed_terraced",
+  "share": 0.21051181497304988,
+  "income_decile_range": [
+   3,
+   6
+  ],
+  "tenure_mix": {
+   "owner_occupied": 0.5918555148564593,
+   "private_rented": 0.2724045057859955,
+   "social_rented": 0.13573997935754517
+  },
+  "building_mix": {
+   "detached": 0.12390328557548488,
+   "semi_detached": 0.24614925929286904,
+   "terraced": 0.38763989769244867,
+   "flat": 0.24230755743919744
+  }
+ },
+ {
+  "name": "t1_city-centre_flats",
+  "share": 0.10092888025964425,
+  "income_decile_range": [
+   3,
+   7
+  ],
+  "tenure_mix": {
+   "owner_occupied": 0.3729337781872469,
+   "private_rented": 0.4789681574779201,
+   "social_rented": 0.14809806433483308
+  },
+  "building_mix": {
+   "detached": 0.04042408958346336,
+   "semi_detached": 0.08607186228023961,
+   "terraced": 0.18833048539517025,
+   "flat": 0.685173562741127
+  }
+ },
+ {
+  "name": "t2_suburban_rural_detached",
+  "share": 0.2765301447550905,
+  "income_decile_range": [
+   7,
+   9
+  ],
+  "tenure_mix": {
+   "owner_occupied": 0.8067643356793528,
+   "private_rented": 0.1275980661769459,
+   "social_rented": 0.06563759814370129
+  },
+  "building_mix": {
+   "detached": 0.5296593363932568,
+   "semi_detached": 0.27081495848347475,
+   "terraced": 0.12497285892927244,
+   "flat": 0.07455284619399599
+  }
+ },
+ {
+  "name": "t3_social_flats",
+  "share": 0.06688694822386367,
+  "income_decile_range": [
+   1,
+   2
+  ],
+  "tenure_mix": {
+   "owner_occupied": 0.2698616574545582,
+   "private_rented": 0.24164484221227886,
+   "social_rented": 0.4884935003331629
+  },
+  "building_mix": {
+   "detached": 0.030206744059028866,
+   "semi_detached": 0.09969897634687164,
+   "terraced": 0.2088543706990914,
+   "flat": 0.661239908895008
+  }
+ },
+ {
+  "name": "t4_social_estates",
+  "share": 0.14545013034823634,
+  "income_decile_range": [
+   1,
+   3
+  ],
+  "tenure_mix": {
+   "owner_occupied": 0.4556147459027806,
+   "private_rented": 0.15194757519799598,
+   "social_rented": 0.3924376788992234
+  },
+  "building_mix": {
+   "detached": 0.08244428446194964,
+   "semi_detached": 0.42243274824366583,
+   "terraced": 0.32430381603292363,
+   "flat": 0.17081915126146086
+  }
+ },
+ {
+  "name": "t5_urban_owner-occupied_semis",
+  "share": 0.19969208144011535,
+  "income_decile_range": [
+   5,
+   8
+  ],
+  "tenure_mix": {
+   "owner_occupied": 0.7688766751166043,
+   "private_rented": 0.13354595408445472,
+   "social_rented": 0.09757737079894102
+  },
+  "building_mix": {
+   "detached": 0.1925116674537308,
+   "semi_detached": 0.5574447499408868,
+   "terraced": 0.1668051832200312,
+   "flat": 0.08323839938535114
+  }
+ }
+]
