@@ -57,6 +57,56 @@ Exploratory work since `main` at `a9f6116`, which uses the spatial_kernel networ
 4. Report the gaps between household types alongside total adoption as a headline outcome.
 5. Check that the pattern across types is not an artefact of how the capability gate and the household characteristic are assigned to LSOA types.
 
+## Design rationale for the prototype
+
+The prototype answers the 30 Sep meeting's conclusion that adoption has to happen without noise before negative word of mouth can be studied. It rests on four choices.
+
+1. **Word of mouth based on experience.**
+   - Only owners talk. In the current model everyone's opinion averages towards their neighbours', so non-owners "spread" opinions they have no experience of.
+   - Contact rates come from DESIGN.md.
+   - What a household hears fades towards its own starting motivation, so motivation needs ongoing input.
+2. **Trigger → choice → lock-in.**
+   - A household considers a heat pump only when its boiler fails, it moves, or similar (1/180 a month).
+   - It then chooses with a logistic probability of its motivation.
+   - Saying no means waiting for the next trigger. This replaces a threshold crossing that noise eventually forces, and fits the COM-B "trigger" idea.
+3. **Dissatisfied owners replace breakdowns.** Three separate settings: how many (`q`), how much a complaint weighs (`w`), and for how long (`duration`).
+4. **Five checks the mechanism had to pass:**
+
+   | Check | Result |
+   |---|---|
+   | (i) S-curve with no dissatisfaction, driven by word of mouth | Pass |
+   | (ii) Robust to seed | Pass |
+   | (iii) Network effect in the expected direction | Weak; only the same-building-type option produces one |
+   | (iv) Extremes span the full range | Pass |
+   | (v) Can reproduce the current model | Fails by design: a different class of model. Keep the current one as a comparator |
+
+**How robust each finding is.**
+- **Robust across every variant:**
+  - the cliff without noise, and fading voices removing it;
+  - dissatisfaction acting as a gradual slowdown in the prototype;
+  - how often owners are dissatisfied mattering more than how much a complaint weighs;
+  - lagging types being hit harder.
+- **Fragile:** every absolute number, since all settings are placeholders and the calibration rests on one rough install rate.
+- **The network results are conditional on these assumptions:**
+  - about 15 contacts each;
+  - triggers spread uniformly;
+  - no installers, grants, costs or landlord decisions.
+
+## Where each finding comes from
+
+Tables are in [RESULTS.md](RESULTS.md).
+
+| Finding | Command | RESULTS.md |
+|---|---|---|
+| Current model is noise-driven; the `w` needed depends on noise | `nwom.py sweep` | 1 |
+| Without noise, bad experiences act as a switch | `lownoise.py sweep` | 2 |
+| Sharp cliff; first-owner placement; fading voices | `cliff.py A`, `B`, `C`, then `report` | 3 |
+| Prototype S-curve, checks, extremes, silent owners | `proto.py checks` | 4 |
+| Calibration; the local vs long-range difference came from contact rates | `proto2.py calib`, `fixes 0.3 0.06 A` | 5 |
+| Network options compared without matching pace | `proto3.py run` | (superseded by 6) |
+| Network options at the same pace; type gaps | `proto4.py calib`, then `net` | 6 |
+| Dose-response; shortfall by type | `proto4.py dose` | 7, 8 |
+
 ## Running the scripts
 
 Run from the project folder (`heatpump-opinions/`) with the project venv, e.g.
@@ -80,3 +130,13 @@ Run from the project folder (`heatpump-opinions/`) with the project venv, e.g.
 | `proto4.py` | `calib`, then `net <seeds> <tag>`, `dose <seeds> <tag>`, `report` | Options matched to the same pace, dose-response and type gaps |
 
 The `cliff`, `proto3` and `proto4` sweeps can be split across processes by part or by seeds, as above.
+
+**How the scripts depend on each other:**
+- `common.py` provides the paths and archetypes; every script imports it.
+- `nwom.py` holds the vectorised current model (`run`, `base_settings`).
+  - `lownoise.py` and `cliff.py` import it and set `nwom.N_STEPS = 300` when imported.
+  - `proto.py` and `proto3.py` use its `base_settings` to build the worlds.
+- `proto.py` holds the prototype. `proto2.py` imports it and passes the calibration (0.3, 0.06) as arguments.
+- `proto3.py` is a copy of the prototype with network options A–C, the shuffled network and type metrics added. It does not import `proto.py`. With options off and contact rates equal, it gives the same distribution of results as `proto.py`, though not identical runs (one random draw differs).
+- `proto4.py` imports `proto3.py`. Run `proto4.py calib` first: it writes `results/negative_wom/proto4_calibration.json`, which `net` and `dose` read.
+- Each `report` reads the CSVs its sweep wrote to `results/negative_wom/`.
