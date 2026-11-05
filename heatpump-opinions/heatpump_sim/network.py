@@ -194,6 +194,27 @@ def build_network(
     return graph
 
 
+def rewire_preserving_degree(graph: nx.Graph, rng: np.random.Generator) -> nx.Graph:
+    """Shuffle who is tied to whom while keeping (almost exactly) each
+    household's number of ties: a configuration-model null. Self-loops and
+    repeated pairs from the shuffle are dropped, which removes a handful of
+    ties. If a result is the same on the rewired network, the network's
+    structure is not what produced it.
+
+    Selected with `network.rewire: true`; edges are tagged `kind: rewired`.
+    """
+    n = graph.number_of_nodes()
+    edges = np.array(list(graph.edges()), dtype=np.int64).reshape(-1, 2)
+    stubs = np.repeat(np.arange(n), np.bincount(edges.ravel(), minlength=n))
+    rng.shuffle(stubs)
+    pairs = np.sort(stubs[: len(stubs) // 2 * 2].reshape(-1, 2), axis=1)
+    pairs = np.unique(pairs[pairs[:, 0] != pairs[:, 1]], axis=0)
+    rewired = nx.Graph()
+    rewired.add_nodes_from(range(n))
+    rewired.add_edges_from(pairs.tolist(), kind="rewired")
+    return rewired
+
+
 def summarise_network(
     graph: nx.Graph,
     locations: np.ndarray,

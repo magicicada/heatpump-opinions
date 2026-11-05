@@ -1,7 +1,8 @@
 # Heat Pump Adoption Simulation
 
-Agent-based simulation of opinion formation and heat pump adoption over a
-social network of households.
+Agent-based simulation of heat pump adoption over a social network of
+households, driven by owners' word of mouth — good and bad — and by the
+moments when a household reconsiders its heating.
 
 ## Run it
 
@@ -18,15 +19,15 @@ it ran on, so runs sit side by side instead of overwriting each other:
 
 ```
 results/segregated_town/
-    history.npz         raw arrays (opinions, ownership, breakdowns, world attributes)
+    history.npz         monthly arrays (ownership, dissatisfaction, motivation) and world attributes
     network.graphml     the social network
     run_info.json       what produced this run — world, seed, parameters, outcome
-    *.gif               animations
+    *.gif               animation of motivation and ownership
 ```
 
 Useful flags: `--world <path>` and `--seed <n>` to override the settings for
 one run, `--run-name` to name the output directory, and `--no-animations`
-to skip GIF rendering (which dominates runtime).
+to skip GIF rendering (which takes a few minutes on an LSOA-scale world).
 
 ```bash
 python3 run_simulation.py --world examples/worlds/mixed_town.csv --no-animations
@@ -44,7 +45,7 @@ python3 analysis/world_comparison_sweep.py --seeds 30
 It defaults to the `segregated_town` / `mixed_town` pair in
 [`examples/worlds/`](examples/worlds/README.md), which differ only in how
 segregated the town is. Both hold the same number of households at the same
-coordinates, so a given seed produces the same initial opinions and — even
+coordinates, so a given seed produces the same starting motivations and — even
 with the spatial network — the same social network in both. The pairing is
 tight and the only difference is who lives where.
 Writes a per-run CSV and a summary figure to `analysis/`.
@@ -58,14 +59,15 @@ households in-process instead, set `households.location_source: generate`.
 
 ## Structure
 
-- `settings.yaml` — every tunable parameter for both stages (household
-  count, network type, opinion dynamics rates, thresholds, world
-  generation, output paths).
+- `settings.yaml` — every tunable parameter for both stages (world
+  generation, network, adoption, motivation, word of mouth,
+  dissatisfaction, output paths).
 - `generate_world.py` / `heatpump_sim/worldgen.py` — **stage one**. Tiles a
   model town with a grid of LSOA-like cells, assigns each an archetype
   (distributions over tenure, building type and income decile), draws
   households inside it and composes their `characteristic` from the drawn
-  attributes. Cells hold `world_generation.households_per_cell` households
+  attributes. The archetypes are the six LSOA types from
+  `analysis/lsoa_types.py`, derived by `analysis/derive_archetypes.py`. Cells hold `world_generation.households_per_cell` households
   (694 by default, the mean for an English LSOA), so the default world has
   11,104 households; the small committed examples are for reading and
   quick tests, not results — see
@@ -76,7 +78,8 @@ households in-process instead, set `households.location_source: generate`.
   validation. See [WORLD_FORMAT.md](WORLD_FORMAT.md).
 - `heatpump_sim/agents.py` — loads a world file, or (in `generate` mode)
   synthesises locations and a spatially-correlated `characteristic`
-  directly, then sets initial opinions and heat pump ownership.
+  directly, then sets baseline motivations, the first owners and which of
+  them start dissatisfied.
 - `heatpump_sim/network.py` — builds the social network, selected via
   `network.type`. The default, `spatial_kernel`, follows the network
   review in the 26 Aug briefing: a local tie between two households forms
@@ -89,47 +92,61 @@ households in-process instead, set `households.location_source: generate`.
   degree, in which case the realised decay is flatter than asked for.
   `preferential_attachment` (Barabási–Albert), `random` (Erdős–Rényi) and
   `small_world` (Watts–Strogatz) remain available; BA is kept only as an
-  unrealistic comparator. Each run's `run_info.json` records a
+  unrealistic comparator. `network.rewire: true` shuffles who is tied to
+  whom while keeping everyone's number of ties, as a null for "does the
+  network's structure matter?". Each run's `run_info.json` records a
   `network_summary`, including the realised and expected share of ties that
   cross a cell boundary.
-- `heatpump_sim/dynamics.py` — per-timestep update:
-  1. Each household's opinion moves toward its network neighbours' mean
-     opinion, plus a steady increase if it owns a working heat pump, plus
-     noise.
-  2. A small fraction of heat pump owners (`heatpumps.breakdown_rate`)
-     break down each turn: their `broken_down` flag is set, opinion is
-     forced to 0, and they're excluded from all further opinion updates —
-     so it can never rise again.
-  3. Any household without a heat pump whose opinion has crossed its
-     *effective* install threshold gets one installed. The effective
-     threshold is `install_threshold - characteristic_weight * characteristic`,
-     so higher-characteristic households (more economic capacity) need less
-     opinion before they act on it — the `characteristic` was otherwise only
-     used once, to pick the initial owners, so this brings it back into the
-     ongoing adoption decision instead of leaving it inert after t=0.
-     Households with `characteristic` below `characteristic_gate` are
-     structurally excluded regardless: no opinion, however high, lets them
-     adopt. This models a hard barrier (e.g. renting, flats, no financial
-     means) as distinct from the graded discount above.
-- `heatpump_sim/simulate.py` — orchestrates a run and records full history.
-- `heatpump_sim/visualize.py` — renders the two animations.
+- `heatpump_sim/dynamics.py` — the monthly update (see its docstring for
+  the equations):
+  1. **Word of mouth from experience.** Only owners talk, each to each
+     contact with probability `contact_rate` a month. A satisfied owner's
+     message raises the listener's motivation; a dissatisfied owner's
+     complaint lowers it, counting as `dissatisfaction.weight` messages.
+     Motivation fades back towards each household's own baseline, so it
+     needs ongoing input.
+  2. **Complaints fade.** A dissatisfied owner falls silent after a mean of
+     `duration_months` (or never). Silent, they no longer complain — but
+     they no longer speak well of heat pumps either.
+  3. **Trigger, then choice.** A household considers a heat pump only when
+     something prompts it — boiler replacement, moving, renovation — at
+     `trigger_rate` a month (about every 15 years). It then adopts with a
+     logistic probability of its motivation, the half-way point lowered for
+     higher-`characteristic` households; otherwise it waits for its next
+     trigger. Households below `capability_gate` never adopt. A new owner is
+     dissatisfied with probability `dissatisfaction.share`.
 
-## A note on `opinions.noise_std`
+  Two optional variants of word of mouth, off by default: complex
+  contagion (`complex_contagion_beta` > 1, several voices count for more
+  than one) and credibility from similar homes (`similar_home_credibility`,
+  messages from owners in a different building type count for less).
+- `heatpump_sim/simulate.py` — orchestrates a run and records the monthly
+  history. `run_dynamics` runs on a given population and network, so sweeps
+  can reuse a built network.
+- `heatpump_sim/metrics.py` — outcomes: adoption at 5/10/15/25 years, time
+  to half of eligible households, install rates, adoption by LSOA type and
+  the gap between types, and how clustered owners are on the network.
+- `heatpump_sim/visualize.py` — renders the motivation and ownership animation.
 
-Non-owners' opinions relax toward the average opinion of their network
-neighbours. With low noise this settles into a stable local average that,
-for most households, never gets close to the 0.95 install threshold
-unless nearly all of a household's neighbours already have high opinions —
-a bootstrap-percolation-style stall where adoption never takes off. Raising
-`noise_std` (default 0.10) adds enough random fluctuation that some
-households occasionally cross the threshold by chance, become new
-"champions," and reinforce their neighbourhood — producing the classic
-S-curve adoption pattern. Lower it if you want to study the stalled regime
-instead.
+## Where the mechanism came from
+
+The model previously moved every household's *opinion* towards its
+neighbours' average, with random noise, and installed a heat pump the first
+time opinion crossed a threshold. Because adoption was permanent, noise
+alone eventually carried most households over the threshold: noise, not the
+network or word of mouth, set the result. The current mechanism was
+prototyped by Michael Fell in October 2026 to remove that dependence; see
+[`analysis/negative_wom/README.md`](analysis/negative_wom/README.md) for the
+exploration and [`RESULTS.md`](analysis/negative_wom/RESULTS.md) for its
+findings. The package reproduces his prototype run for run. The old model
+is on the `negative-wom-exploration` branch.
+
+All dynamics values in `settings.yaml` are placeholders, calibrated only to
+year-1 installs of roughly 0.3% of homes a year.
 
 ## Everything is a knob
 
-All of the numbers above (household count, initial adoption fraction,
-breakdown rate, install threshold, opinion rates, network type/params,
-timesteps, random seed) live in `settings.yaml` — edit and rerun to explore
+All of the numbers above (trigger rate, motivation and word-of-mouth
+rates, dissatisfaction, capability gate, network type/params, months,
+random seed) live in `settings.yaml` — edit and rerun to explore
 different scenarios.

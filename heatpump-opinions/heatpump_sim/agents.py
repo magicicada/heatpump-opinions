@@ -1,5 +1,6 @@
-"""Household generation: locations, spatially-correlated characteristic,
-initial opinions, and initial heat pump ownership."""
+"""Households: the population (locations, characteristic, descriptive
+attributes) and their adoption state (motivation, ownership,
+dissatisfaction)."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -12,23 +13,30 @@ from .world import read_world
 
 
 @dataclass
-class Households:
-    """State for all households. Arrays are all length n, index-aligned."""
+class Population:
+    """Who lives where. Fixed over a run. Arrays are length n, index-aligned."""
 
     locations: np.ndarray       # (n, 2) float, x/y position in the geographic space
-    characteristic: np.ndarray  # (n,) float in [0, 1], demographic/economic number
-    opinion: np.ndarray         # (n,) float in [0, 1], opinion of heat pumps
-    has_heatpump: np.ndarray    # (n,) bool
-    broken_down: np.ndarray     # (n,) bool, True once a heat pump has broken down
+    characteristic: np.ndarray  # (n,) float in [0, 1], demographic/economic capability
 
     # Descriptive attributes carried over from a loaded world file (tenure,
-    # building type, ...). Empty for generated populations. The dynamics
-    # never read these; they exist so results can be broken down by them.
+    # building type, ...). Empty for generated populations.
     attributes: dict[str, np.ndarray] = field(default_factory=dict)
 
     @property
     def n(self) -> int:
         return len(self.locations)
+
+
+@dataclass
+class AdoptionState:
+    """Everything that changes over a run."""
+
+    baseline: np.ndarray       # (n,) motivation each household relaxes back to
+    motivation: np.ndarray     # (n,) current motivation in [0, 1]
+    owner: np.ndarray          # (n,) bool, has a heat pump
+    dissatisfied: np.ndarray   # (n,) bool, owner with a bad experience
+    complaining: np.ndarray    # (n,) bool, dissatisfied owner still talking negatively
 
 
 def _generate_locations(n: int, space_size: tuple[float, float], rng: np.random.Generator) -> np.ndarray:
@@ -52,21 +60,21 @@ def _generate_correlated_characteristic(
     centers = rng.uniform(low=lo, high=hi, size=(n_centers, 2))
     amplitudes = rng.normal(0, 1, size=n_centers)
 
-    field = np.zeros(len(locations))
+    values = np.zeros(len(locations))
     for center, amp in zip(centers, amplitudes):
         d2 = np.sum((locations - center) ** 2, axis=1)
-        field += amp * np.exp(-d2 / (2 * length_scale ** 2))
+        values += amp * np.exp(-d2 / (2 * length_scale ** 2))
 
-    field += rng.normal(0, noise_std, size=len(locations))
+    values += rng.normal(0, noise_std, size=len(locations))
 
-    field_min, field_max = field.min(), field.max()
-    return (field - field_min) / (field_max - field_min)
+    v_min, v_max = values.min(), values.max()
+    return (values - v_min) / (v_max - v_min)
 
 
-def initialize_households(settings: Settings, rng: np.random.Generator) -> Households:
-    n = settings.get("households.n_households")
-    source = settings.get("households.location_source", "generate")
-    attributes: dict[str, np.ndarray] = {}
+def load_population(settings: Settings, rng: np.random.Generator) -> Population:
+    """Read the world file, or (in `generate` mode) synthesise locations and a
+    spatially correlated characteristic. Only `generate` mode draws from rng."""
+    source = settings.get("households.location_source", "file")
 
     if source == "file":
         file_path = settings.get("households.households_source_file")
@@ -82,13 +90,10 @@ def initialize_households(settings: Settings, rng: np.random.Generator) -> House
                 f"or set households.location_source to 'generate'."
             )
         world = read_world(file_path)
-        locations = world.locations
-        characteristic = world.characteristic
-        attributes = world.attributes
-        # The file is authoritative on population size; n_households is only
-        # consulted when generating.
-        n = world.n
-    elif source == "generate":
+        return Population(world.locations, world.characteristic, world.attributes)
+
+    if source == "generate":
+        n = settings.get("households.n_households")
         space_size = tuple(settings.get("households.space_size", [1.0, 1.0]))
         locations = _generate_locations(n, space_size, rng)
         field_cfg = settings.get("households.characteristic_field", {})
@@ -99,30 +104,37 @@ def initialize_households(settings: Settings, rng: np.random.Generator) -> House
             noise_std=field_cfg.get("noise_std", 0.15),
             rng=rng,
         )
+        return Population(locations, characteristic)
+
+    raise ValueError(f"Unknown households.location_source: {source!r}")
+
+
+def initial_state(
+    characteristic: np.ndarray, params: dict, rng: np.random.Generator
+) -> AdoptionState:
+    """Baseline motivations, the first owners and which of them start
+    dissatisfied. `params` is the dict from dynamics.adoption_params().
+
+    The first owners are drawn from the top `top_pool_fraction` of households
+    by characteristic ("top"), or from everyone ("random").
+    """
+    n = len(characteristic)
+    baseline = np.clip(rng.normal(params["baseline_mean"], params["baseline_sd"], n), 0, 1)
+
+    if params["initial_owners"] == "top":
+        pool = np.argsort(characteristic)[-round(params["top_pool_fraction"] * n):]
+    elif params["initial_owners"] == "random":
+        pool = np.arange(n)
     else:
-        raise ValueError(f"Unknown households.location_source: {source!r}")
+        raise ValueError(f"adoption.initial_owners must be 'top' or 'random', got {params['initial_owners']!r}")
+    owner = np.zeros(n, dtype=bool)
+    owner[rng.choice(pool, round(params["initial_fraction"] * n), replace=False)] = True
 
-    opinion_mean = settings.get("opinions.initial_mean", 0.5)
-    opinion_std = settings.get("opinions.initial_std", 0.15)
-    opinion = np.clip(rng.normal(opinion_mean, opinion_std, size=n), 0.0, 1.0)
-
-    has_heatpump = np.zeros(n, dtype=bool)
-    broken_down = np.zeros(n, dtype=bool)
-
-    initial_fraction = settings.get("heatpumps.initial_fraction", 0.05)
-    top_pool_fraction = settings.get("heatpumps.top_pool_fraction", 0.10)
-
-    n_initial = round(n * initial_fraction)
-    pool_size = max(n_initial, round(n * top_pool_fraction))
-    top_pool = np.argsort(characteristic)[-pool_size:]
-    chosen = rng.choice(top_pool, size=n_initial, replace=False)
-    has_heatpump[chosen] = True
-
-    return Households(
-        locations=locations,
-        characteristic=characteristic,
-        opinion=opinion,
-        has_heatpump=has_heatpump,
-        broken_down=broken_down,
-        attributes=attributes,
+    dissatisfied = owner & (rng.random(n) < params["dissatisfied_share"])
+    return AdoptionState(
+        baseline=baseline,
+        motivation=baseline.copy(),
+        owner=owner,
+        dissatisfied=dissatisfied,
+        complaining=dissatisfied.copy(),
     )

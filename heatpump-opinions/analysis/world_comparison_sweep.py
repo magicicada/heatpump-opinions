@@ -7,7 +7,7 @@ which share a generation seed and differ only in `world_generation.mixing`
 scattered at random.
 
 The comparison is *paired*: both worlds hold 200 households at the same
-coordinates, so for a given simulation seed the initial opinion vector and
+coordinates, so for a given simulation seed the starting motivations and
 the social network (spatial or not) are identical between them. The only
 thing that differs is which household sits where, and therefore who is
 capable of adopting. That makes a paired test
@@ -32,30 +32,17 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from heatpump_sim.metrics import months_to
 from heatpump_sim.settings import Settings
 from heatpump_sim.simulate import run_simulation
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 OUT_DIR = Path(__file__).resolve().parent
-THRESHOLDS = [0.20, 0.50, 0.90]
+THRESHOLDS = [0.10, 0.25, 0.50]
 DEFAULT_WORLDS = [
     PROJECT_ROOT / "examples/worlds/segregated_town.csv",
     PROJECT_ROOT / "examples/worlds/mixed_town.csv",
 ]
-
-
-def time_to_threshold(curve: np.ndarray, threshold: float) -> float | None:
-    """First timestep at which adoption reaches `threshold`, linearly
-    interpolated. None if never reached."""
-    above = np.where(curve >= threshold)[0]
-    if len(above) == 0:
-        return None
-    t = int(above[0])
-    if t == 0:
-        return 0.0
-    y0, y1 = curve[t - 1], curve[t]
-    frac = (threshold - y0) / (y1 - y0) if y1 != y0 else 0.0
-    return (t - 1) + frac
 
 
 def run_one(world_path: Path, seed: int, base: dict) -> dict:
@@ -65,17 +52,18 @@ def run_one(world_path: Path, seed: int, base: dict) -> dict:
     cfg["simulation"]["random_seed"] = seed
 
     result = run_simulation(Settings(cfg))
-    curve = result.heatpump_history.mean(axis=1)
+    h = result.history
+    curve = h.owner.mean(axis=1)
 
     row = {
         "world": world_path.stem,
         "seed": seed,
         "n_households": len(result.locations),
         "final_adoption": float(curve[-1]),
-        "total_broken": int(result.broken_history[-1].sum()),
+        "total_dissatisfied": int(h.dissatisfied[-1].sum()),
     }
     for th in THRESHOLDS:
-        t = time_to_threshold(curve, th)
+        t = months_to(curve, th)
         row[f"t_to_{int(th * 100)}pct"] = t
         # Whether the threshold was reached at all. Comparing *times* alone
         # conditions on reaching it, which biases the comparison when the
@@ -84,7 +72,7 @@ def run_one(world_path: Path, seed: int, base: dict) -> dict:
 
     # Breakdown by descriptive attributes — the payoff of carrying them
     # through from the world file.
-    final = result.heatpump_history[-1]
+    final = h.owner[-1]
     for attr in ("tenure", "building_type", "lsoa_archetype"):
         values = result.attributes.get(attr)
         if values is None:
@@ -180,7 +168,7 @@ def main() -> None:
     print(f"WORLD COMPARISON — {args.seeds} simulation seeds per world")
     print("=" * 72)
 
-    headline = ["final_adoption", "total_broken"]
+    headline = ["final_adoption", "total_dissatisfied"]
     for t in THRESHOLDS:
         headline += [f"t_to_{int(t*100)}pct", f"reached_{int(t*100)}pct"]
     print(f"\n{'metric':<18}" + "".join(f"{n:>22}" for n in names))
@@ -191,7 +179,7 @@ def main() -> None:
                             dtype=float)
             cells.append("never reached" if len(vals) == 0 else f"{vals.mean():.3f} ± {vals.std(ddof=1):.3f}")
         print(f"{metric:<18}" + "".join(f"{c:>22}" for c in cells))
-    print("\n(mean ± sd across seeds; times are in timesteps)")
+    print("\n(mean ± sd across seeds; times are in months)")
 
     if len(names) == 2:
         print(f"\nPaired differences ({names[0]} minus {names[1]}):")
@@ -204,7 +192,7 @@ def main() -> None:
                           f"runs that got there.\n"
                           f"        Read it alongside reached_{metric.split('_')[-1]}, which is unbiased.")
         print("\nPairing is meaningful: both worlds have the same households at the same\n"
-              "coordinates, so a given seed yields the same initial opinions and the same\n"
+              "coordinates, so a given seed yields the same starting motivations and the same\n"
               "social network.\n"
               "p-values measure only whether the gap exceeds this model's own Monte Carlo\n"
               "noise — not whether it holds for real towns.")
@@ -242,7 +230,7 @@ def make_plot(rows, curves, names, tenure_cols, out_dir: Path) -> Path:
         t = np.arange(arr.shape[1])
         ax.plot(t, mean, color=colors.get(name), label=name)
         ax.fill_between(t, mean - sd, mean + sd, color=colors.get(name), alpha=0.18, linewidth=0)
-    ax.set_xlabel("timestep")
+    ax.set_xlabel("month")
     ax.set_ylabel("adoption fraction")
     ax.set_title("Adoption over time (mean ±1 sd)")
     ax.legend(fontsize=8)

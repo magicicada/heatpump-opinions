@@ -74,7 +74,7 @@ prefix — `attr_tenure`, `attr_building_type`, and so on:
 ```python
 d = np.load("results/history.npz")
 adopted_by_tenure = {
-    t: d["heatpump_history"][-1][d["attr_tenure"] == t].mean()
+    t: d["owner_history"][-1][d["attr_tenure"] == t].mean()
     for t in np.unique(d["attr_tenure"])
 }
 ```

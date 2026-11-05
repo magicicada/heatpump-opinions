@@ -1,27 +1,79 @@
 # Simulation Inputs
 
 All inputs live in [`settings.yaml`](settings.yaml). Defaults shown below.
+The dynamics values are placeholders, calibrated only to year-1 installs of
+roughly 0.3% of homes a year (see
+[`analysis/negative_wom/RESULTS.md`](analysis/negative_wom/RESULTS.md), table 5).
 
 ## simulation
 
 | Parameter | Default | Meaning |
 |---|---|---|
-| `num_timesteps` | 100 | Number of turns to simulate |
-| `random_seed` | 42 | Seed for all randomness (reproducibility) |
+| `months` | 300 | Months to simulate (one step is one month; 300 = 25 years) |
+| `random_seed` | 42 | Seed for all randomness in a run (network, starting state, dynamics) |
 
 ## households
 
 | Parameter | Default | Meaning |
 |---|---|---|
-| `n_households` | 100 | Number of agents |
-| `space_size` | [1.0, 1.0] | Width/height of the geographic space |
 | `location_source` | file | `file` loads a world file (stage one output); `generate` synthesises households in-process |
 | `households_source_file` | worlds/model_town.csv | World file path when `location_source: file` — see [WORLD_FORMAT.md](WORLD_FORMAT.md). The file is authoritative on population size |
-| `characteristic_field.n_centers` | 8 | Number of random spatial "hotspots" summed to build the demographic field |
+| `n_households` | 100 | Households to synthesise (`generate` mode only) |
+| `space_size` | [1.0, 1.0] | Width/height of the space (`generate` mode only) |
+| `characteristic_field.n_centers` | 8 | Number of random spatial "hotspots" summed to build the characteristic (`generate` mode only) |
 | `characteristic_field.length_scale` | 0.3 | How quickly a hotspot's influence decays with distance |
 | `characteristic_field.noise_std` | 0.15 | Random noise added on top of the smooth spatial field |
 
-The `characteristic` is a single demographic/economic number in [0, 1] per household, spatially correlated so nearby households tend to be similar. The `characteristic_field.*` settings apply only in `generate` mode; in `file` mode the number comes from the world file.
+`generate` mode produces no descriptive attributes, so it cannot be used with
+`word_of_mouth.similar_home_credibility` (which needs building types) and
+reports no results by LSOA type.
+
+## adoption
+
+| Parameter | Default | Meaning |
+|---|---|---|
+| `initial_fraction` | 0.01 | Share of households owning a heat pump at month 0 (~1% today) |
+| `initial_owners` | top | `top`: first owners drawn from the top `top_pool_fraction` by `characteristic`; `random`: from everyone |
+| `top_pool_fraction` | 0.10 | Size of that top slice |
+| `trigger_rate` | 1/180 | Chance a month that a non-owner reconsiders its heating (boiler replacement, moving, renovation): a ~15-year boiler life |
+| `capability_gate` | 0.30 | Households with `characteristic` below this can never adopt |
+| `half_point` | 0.8 | Motivation at which a triggered household adopts with probability 1/2 ... |
+| `characteristic_weight` | 0.2 | ... lowered by `characteristic_weight × characteristic`, so better-placed households need less motivation |
+| `slope` | 0.07 | How sharply the adoption probability rises with motivation (logistic scale) |
+
+## motivation
+
+| Parameter | Default | Meaning |
+|---|---|---|
+| `baseline_mean` | 0.3 | Mean of households' own baseline motivation (0-1), calibrated |
+| `baseline_sd` | 0.15 | Spread of baseline motivation |
+| `memory` | 0.05 | Share of the gap back to baseline closed each month: what people hear fades |
+
+## word_of_mouth
+
+Only owners talk.
+
+| Parameter | Default | Meaning |
+|---|---|---|
+| `contact_rate` | 0.72 | Chance a month that an owner talks to each of its contacts (DESIGN.md) |
+| `message_strength` | 0.06 | Share of the gap to 1 that a satisfied owner's message closes, calibrated |
+| `complex_contagion_beta` | 1.0 | Option A. Above 1, several voices in a month count for more than one: effective messages = messages × (messages / reference)^(beta − 1). 1 is off |
+| `complex_contagion_reference` | 2 | The number of voices at which option A neither boosts nor discounts |
+| `similar_home_credibility` | 0.0 | Option B. A message from an owner in a different building type counts (1 − this). 0 is off |
+
+Turning on option A or B slows adoption at a given `message_strength`; to
+compare options at the same pace, recalibrate `message_strength` (Michael's
+values are in RESULTS.md, table 6).
+
+## dissatisfaction
+
+The negative word-of-mouth lever.
+
+| Parameter | Default | Meaning |
+|---|---|---|
+| `share` | 0.0 | Chance a new owner (including first owners) is dissatisfied (q) |
+| `weight` | 1.0 | A complaint pushes motivation down as hard as this many positive messages push it up (w); 0 makes dissatisfied owners silent |
+| `duration_months` | null | Mean months a dissatisfied owner keeps complaining before falling silent; `null` = forever. Silent dissatisfied owners still do not speak positively |
 
 ## world_generation
 
@@ -30,7 +82,8 @@ Stage one only (`generate_world.py`); the simulation never reads this section.
 | Parameter | Default | Meaning |
 |---|---|---|
 | `seed` | 7 | Seed for world generation (separate from `simulation.random_seed`) |
-| `n_households` | 400 | Households to generate |
+| `n_households` | 400 | Households to generate, used only when `households_per_cell` is null |
+| `households_per_cell` | 694 | Households per cell, the mean for an English LSOA; 11,104 on the 4×4 grid |
 | `space_size` | [1.0, 1.0] | Extent of the model town |
 | `grid` | [4, 4] | Rows, cols of LSOA-like cells tiling the town |
 | `mixing` | 0.3 | `0` = clean affluence gradient across the grid, `1` = archetypes scattered at random. The segregation knob |
@@ -39,44 +92,25 @@ Stage one only (`generate_world.py`); the simulation never reads this section.
 | `capability.noise_std` | 0.05 | Household-level variation within an archetype |
 | `capability.tenure_scores` | see settings | Capability score per tenure — **placeholder, revisit** |
 | `capability.building_scores` | see settings | Capability score per building type — **placeholder, revisit** |
-| `archetypes` | 3 archetypes | Per-archetype `share`, `income_decile_range`, `tenure_mix`, `building_mix` — **placeholders** standing in for real LSOA data. Order is irrelevant; sorted by mean income decile when laid out |
-
-## heatpumps
-
-| Parameter | Default | Meaning |
-|---|---|---|
-| `initial_fraction` | 0.05 | Fraction of households starting with a heat pump |
-| `top_pool_fraction` | 0.10 | Initial owners are drawn from this top slice by `characteristic` |
-| `install_threshold` | 0.95 | Base opinion level that triggers a new install |
-| `characteristic_weight` | 0.2 | Discounts a household's own install threshold by `characteristic_weight * characteristic` — higher-characteristic households need less opinion to adopt (set to 0 to disable) |
-| `characteristic_gate` | 0.15 | Households with `characteristic` below this can never adopt, regardless of opinion — a hard structural barrier, distinct from the graded discount above (set to 0 to disable) |
-| `breakdown_rate` | 0.01 | Per-turn probability a working heat pump breaks down |
-
-## opinions
-
-| Parameter | Default | Meaning |
-|---|---|---|
-| `initial_mean` | 0.5 | Mean of each household's starting opinion (0-1) |
-| `initial_std` | 0.15 | Std. dev. of starting opinion |
-| `self_increase_rate` | 0.10 | Per-turn opinion increase for happy (non-broken) owners |
-| `social_influence_rate` | 0.12 | Weight given to the mean opinion of network neighbours |
-| `noise_std` | 0.10 | Random perturbation applied to opinion each turn — drives the stochastic tipping needed for adoption to spread (see [README](README.md)) |
+| `archetypes` | six LSOA types | Per-type `share`, `income_decile_range`, `tenure_mix`, `building_mix`, from `analysis/derive_archetypes.py`. Order is irrelevant; sorted by mean income decile when laid out |
 
 ## network
 
 | Parameter | Default | Meaning |
 |---|---|---|
-| `type` | preferential_attachment | Social network topology: `preferential_attachment`, `random`, or `small_world` |
-| `params.m` | 3 | Edges each new node attaches with (Barabási–Albert, used by `preferential_attachment`) |
-| `params.p` | — | Edge probability (`random`) or rewiring probability (`small_world`) |
-| `params.k` | — | Each node's initial neighbours (`small_world`) |
+| `type` | spatial_kernel | `spatial_kernel`; or `preferential_attachment`, `random`, `small_world` as comparators |
+| `params.mean_degree` | 15 | Average ties per household (`spatial_kernel`) |
+| `params.decay_length_m` | 210 | Distance over which the chance of a local tie falls by a factor of e |
+| `params.long_range_fraction` | 0.30 | Share of ties placed ignoring geography |
+| `params.metres_per_unit` | 2000 | Metres per unit of world coordinates — **placeholder** (2 km town, 500 m cells) |
+| `params.m`, `params.p`, `params.k` | — | Parameters of the comparator networks |
+| `rewire` | false | Shuffle who is tied to whom, keeping each household's number of ties: a null for whether structure matters |
 
 ## output
 
 | Parameter | Default | Meaning |
 |---|---|---|
 | `results_dir` | results | Output directory |
-| `opinion_animation` | opinion_animation.gif | Opinion-only animation filename |
-| `heatpump_animation` | heatpump_animation.gif | Adoption-only animation filename |
-| `combined_animation` | combined_animation.gif | Side-by-side animation filename |
+| `animation` | adoption_animation.gif | Motivation and ownership animation filename |
+| `animation_every_months` | 3 | One animation frame per this many months |
 | `fps` | 8 | Animation frame rate |

@@ -1,9 +1,12 @@
-# Settings for the heat pump adoption / opinion diffusion simulation.
+# Settings for the heat pump adoption simulation.
 # Every tunable knob for the model lives here so runs are reproducible
 # and so alternative scenarios can be explored without touching code.
+# Dynamics values are the calibrated prototype from the October exploration
+# (analysis/negative_wom/RESULTS.md, tables 5-8): PLACEHOLDERS throughout,
+# calibrated only to one rough install rate.
 
 simulation:
-  num_timesteps: 100
+  months: 300          # one step is one month; 300 = 25 years
   random_seed: 42
 
 households:
@@ -26,29 +29,44 @@ households:
     length_scale: 0.3      # how quickly influence of a hotspot decays with distance
     noise_std: 0.15         # random noise added on top of the smooth spatial field
 
-heatpumps:
-  initial_fraction: 0.05     # fraction of households that start with a heat pump
-  top_pool_fraction: 0.10    # initial heat pumps are drawn from this top slice by characteristic
-  install_threshold: 0.95    # base opinion threshold that triggers a new install
-  characteristic_weight: 0.2 # how much a household's characteristic discounts its own
-                              # install threshold (effective_threshold = install_threshold
-                              # - characteristic_weight * characteristic), so higher-
-                              # characteristic households need less opinion to act on
-  characteristic_gate: 0.15  # households with characteristic below this can never adopt,
-                              # no matter how high their opinion — a hard structural
-                              # barrier (e.g. flat/tenure/no financial means), distinct
-                              # from the graded discount above (set to 0 to disable)
-  breakdown_rate: 0.01       # per-timestep probability an owned, working heat pump breaks down
+# Who can adopt, when they consider it, and how likely they are to say yes.
+adoption:
+  initial_fraction: 0.01     # ~1% of homes have a heat pump today
+  initial_owners: top        # top: first owners drawn from the top_pool_fraction by
+                             # characteristic; random: drawn from everyone
+  top_pool_fraction: 0.10
+  trigger_rate: 0.0055555556 # chance a month that a non-owner reconsiders its heating
+                             # (boiler replacement, moving, renovation): 1/180, a
+                             # ~15-year boiler life
+  capability_gate: 0.30      # households with characteristic below this can never adopt
+  half_point: 0.8            # motivation at which a triggered household adopts with
+                             # probability 1/2 ...
+  characteristic_weight: 0.2 # ... lowered by characteristic_weight * characteristic
+  slope: 0.07                # how sharply adoption probability rises with motivation
 
-opinions:
-  initial_mean: 0.5
-  initial_std: 0.15
-  self_increase_rate: 0.10    # per-turn opinion increase for happy (non-broken) owners
-  social_influence_rate: 0.12 # weight given to the mean opinion of network neighbours
-  noise_std: 0.10               # random perturbation applied each turn (drives stochastic
-                                 # tipping: without it, non-owner opinions settle into a
-                                 # stable local average and adoption never crosses the
-                                 # install threshold — see README for the full explanation)
+motivation:
+  baseline_mean: 0.3         # households' own starting motivation; calibrated so that
+  baseline_sd: 0.15          # year-1 installs are ~0.3% of homes a year
+  memory: 0.05               # share of the gap back to baseline closed each month
+
+# Only owners talk; see heatpump_sim/dynamics.py.
+word_of_mouth:
+  contact_rate: 0.72         # chance a month an owner talks to each contact (DESIGN.md)
+  message_strength: 0.06     # share of the gap to 1 a positive message closes (calibrated)
+  # Option A, complex contagion: >1 makes several voices count for more than one.
+  # Michael's runs used 1.5-2, recalibrating message_strength to keep the pace.
+  complex_contagion_beta: 1.0
+  complex_contagion_reference: 2
+  # Option B: a message from an owner in a different building type counts
+  # (1 - this). Michael's runs used 0.5-0.9.
+  similar_home_credibility: 0.0
+
+# Owners with a bad experience (the negative word-of-mouth lever).
+dissatisfaction:
+  share: 0.0                 # chance a new owner is dissatisfied (q)
+  weight: 1.0                # a complaint counts as this many positive messages, reversed (w)
+  duration_months: null      # mean months a dissatisfied owner keeps complaining before
+                             # falling silent; null = forever
 
 # ---------------------------------------------------------------------------
 # Stage one: synthetic world generation (generate_world.py). Only read by the
@@ -92,26 +110,42 @@ world_generation:
       terraced: 0.60
       flat: 0.15
 
-  # PLACEHOLDER ARCHETYPES standing in for real LSOA data (tenure, building
-  # type and income decile by LSOA). Shaped to be replaced wholesale once
-  # that data lands, with no code change. Order here does not matter — they
-  # are sorted by mean income decile when laid out on the grid.
+  # Six LSOA types from k-means on England's 33,755 LSOAs (analysis/lsoa_types.py),
+  # as household-weighted profiles: income_decile_range is the 25th-75th
+  # percentile. Order does not matter; they are sorted by mean income decile
+  # when laid out on the grid. Rebuild from the national LSOA table with
+  # analysis/derive_archetypes.py.
   archetypes:
-    - name: deprived_urban
-      share: 0.30
-      income_decile_range: [1, 4]
-      tenure_mix:   {social_rented: 0.45, private_rented: 0.30, owner_occupied: 0.25}
-      building_mix: {flat: 0.50, terraced: 0.30, semi_detached: 0.15, detached: 0.05}
-    - name: mixed_suburban
-      share: 0.45
-      income_decile_range: [4, 7]
-      tenure_mix:   {owner_occupied: 0.60, private_rented: 0.25, social_rented: 0.15}
-      building_mix: {semi_detached: 0.40, terraced: 0.30, flat: 0.20, detached: 0.10}
-    - name: affluent_periphery
-      share: 0.25
-      income_decile_range: [7, 10]
-      tenure_mix:   {owner_occupied: 0.85, private_rented: 0.12, social_rented: 0.03}
-      building_mix: {detached: 0.45, semi_detached: 0.35, terraced: 0.15, flat: 0.05}
+    - name: t0_mixed_terraced
+      share: 0.21051181497304988
+      income_decile_range: [3, 6]
+      tenure_mix:   {owner_occupied: 0.5918555148564593, private_rented: 0.2724045057859955, social_rented: 0.13573997935754517}
+      building_mix: {detached: 0.12390328557548488, semi_detached: 0.24614925929286904, terraced: 0.38763989769244867, flat: 0.24230755743919744}
+    - name: t1_city-centre_flats
+      share: 0.10092888025964425
+      income_decile_range: [3, 7]
+      tenure_mix:   {owner_occupied: 0.3729337781872469, private_rented: 0.4789681574779201, social_rented: 0.14809806433483308}
+      building_mix: {detached: 0.04042408958346336, semi_detached: 0.08607186228023961, terraced: 0.18833048539517025, flat: 0.685173562741127}
+    - name: t2_suburban_rural_detached
+      share: 0.2765301447550905
+      income_decile_range: [7, 9]
+      tenure_mix:   {owner_occupied: 0.8067643356793528, private_rented: 0.1275980661769459, social_rented: 0.06563759814370129}
+      building_mix: {detached: 0.5296593363932568, semi_detached: 0.27081495848347475, terraced: 0.12497285892927244, flat: 0.07455284619399599}
+    - name: t3_social_flats
+      share: 0.06688694822386367
+      income_decile_range: [1, 2]
+      tenure_mix:   {owner_occupied: 0.2698616574545582, private_rented: 0.24164484221227886, social_rented: 0.4884935003331629}
+      building_mix: {detached: 0.030206744059028866, semi_detached: 0.09969897634687164, terraced: 0.2088543706990914, flat: 0.661239908895008}
+    - name: t4_social_estates
+      share: 0.14545013034823634
+      income_decile_range: [1, 3]
+      tenure_mix:   {owner_occupied: 0.4556147459027806, private_rented: 0.15194757519799598, social_rented: 0.3924376788992234}
+      building_mix: {detached: 0.08244428446194964, semi_detached: 0.42243274824366583, terraced: 0.32430381603292363, flat: 0.17081915126146086}
+    - name: t5_urban_owner-occupied_semis
+      share: 0.19969208144011535
+      income_decile_range: [5, 8]
+      tenure_mix:   {owner_occupied: 0.7688766751166043, private_rented: 0.13354595408445472, social_rented: 0.09757737079894102}
+      building_mix: {detached: 0.1925116674537308, semi_detached: 0.5574447499408868, terraced: 0.1668051832200312, flat: 0.08323839938535114}
 
 network:
   type: spatial_kernel   # spatial_kernel | preferential_attachment | random | small_world
@@ -131,9 +165,12 @@ network:
     # random:                  {p: 0.05}
     # small_world:             {k: 4, p: 0.1}
 
+  # true: shuffle who is tied to whom, keeping each household's number of ties
+  # (a null for "does the network's structure matter?")
+  rewire: false
+
 output:
   results_dir: results
-  opinion_animation: opinion_animation.gif
-  heatpump_animation: heatpump_animation.gif
-  combined_animation: combined_animation.gif
+  animation: adoption_animation.gif
+  animation_every_months: 3   # one frame per this many months
   fps: 8

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Entry point: run the heat pump adoption simulation and produce the
-opinion and heat-pump-adoption animations described in settings.yaml.
+motivation and ownership animation described in settings.yaml.
 
 Each run writes to its own subdirectory of `output.results_dir`, named after
 the world it ran on (or `--run-name`), so runs on different worlds sit side
@@ -13,10 +13,11 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+from heatpump_sim.metrics import summarise
 from heatpump_sim.network import expected_cross_cell_share, kernel_params, summarise_network
 from heatpump_sim.settings import Settings
 from heatpump_sim.simulate import run_simulation, save_results
-from heatpump_sim.visualize import animate_combined, animate_heatpumps, animate_opinions
+from heatpump_sim.visualize import animate
 
 
 def default_run_name(settings: Settings) -> str:
@@ -54,19 +55,14 @@ def write_run_info(path: Path, settings: Settings, result, run_name: str) -> Non
             "world_file": settings.get("households.households_source_file"),
             "n_households": int(len(result.locations)),
         },
-        "simulation": {
-            "random_seed": settings.get("simulation.random_seed"),
-            "num_timesteps": settings.get("simulation.num_timesteps"),
-        },
-        "heatpumps": settings.get("heatpumps", {}),
-        "opinions": settings.get("opinions", {}),
+        "simulation": settings.get("simulation", {}),
+        "adoption": settings.get("adoption", {}),
+        "motivation": settings.get("motivation", {}),
+        "word_of_mouth": settings.get("word_of_mouth", {}),
+        "dissatisfaction": settings.get("dissatisfaction", {}),
         "network": settings.get("network", {}),
         "network_summary": network_summary(settings, result),
-        "outcome": {
-            "final_adopted": int(result.heatpump_history[-1].sum()),
-            "final_adoption_fraction": float(result.heatpump_history[-1].mean()),
-            "total_broken_down": int(result.broken_history[-1].sum()),
-        },
+        "outcome": summarise(result.history, result.attributes.get("lsoa_archetype")),
     }
     with open(path, "w") as f:
         json.dump(info, f, indent=2)
@@ -103,24 +99,16 @@ def main() -> None:
     print(f"Saved raw history to {results_dir / 'history.npz'}")
 
     if not args.no_animations:
-        fps = settings.get("output.fps", 8)
+        out = results_dir / settings.get("output.animation", "adoption_animation.gif")
+        print(f"Rendering animation to {out}...")
+        animate(result, out, fps=settings.get("output.fps", 8),
+                every_months=settings.get("output.animation_every_months", 3))
 
-        opinion_out = results_dir / settings.get("output.opinion_animation", "opinion_animation.gif")
-        print(f"Rendering opinion animation to {opinion_out}...")
-        animate_opinions(result, opinion_out, fps=fps)
-
-        heatpump_out = results_dir / settings.get("output.heatpump_animation", "heatpump_animation.gif")
-        print(f"Rendering heat pump animation to {heatpump_out}...")
-        animate_heatpumps(result, heatpump_out, fps=fps)
-
-        combined_out = results_dir / settings.get("output.combined_animation", "combined_animation.gif")
-        print(f"Rendering combined animation to {combined_out}...")
-        animate_combined(result, combined_out, fps=fps)
-
-    n_final_installed = result.heatpump_history[-1].sum()
-    n_broken = result.broken_history[-1].sum()
-    print(f"Done. Final heat pump ownership: {n_final_installed}/{len(result.locations)}; "
-          f"breakdowns so far: {n_broken}")
+    h = result.history
+    months = len(h.owner) - 1
+    print(f"Done. After {months} months ({months / 12:g} years): "
+          f"{h.owner[-1].sum()}/{len(result.locations)} households own a heat pump, "
+          f"{h.dissatisfied[-1].sum()} of them dissatisfied")
     print(f"Results in {results_dir}/")
 
 

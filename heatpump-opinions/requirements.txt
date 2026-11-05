@@ -4,6 +4,6 @@ networkx
 pyyaml
 pillow
 
-# data_prep only -- the simulation itself does not import these
+# data_prep and analysis/derive_archetypes.py only -- the simulation does not import these
 pandas
 openpyxl

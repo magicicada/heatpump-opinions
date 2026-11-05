@@ -1,6 +1,5 @@
-"""Animated visualisations of the simulation: opinion evolution (continuous
-colour scale) and heat pump adoption (binary colour) over the geographic
-layout of households."""
+"""Animated visualisation of a run: motivation (continuous colour scale) and
+heat pump ownership side by side over the geographic layout of households."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -12,6 +11,14 @@ from matplotlib.animation import FuncAnimation, PillowWriter
 from matplotlib.collections import LineCollection
 
 from .simulate import SimulationResult
+
+# Ownership categories, in drawing order.
+OWNERSHIP = (
+    ("Cannot adopt (below gate)", "#e4e3dd"),
+    ("No heat pump", "#a3a29c"),
+    ("Satisfied owner", "#2a78d6"),
+    ("Dissatisfied owner", "#eb6834"),
+)
 
 
 def _draw_network_edges(ax, locations: np.ndarray, graph: nx.Graph) -> None:
@@ -30,126 +37,50 @@ def _marker_size(n: int) -> float:
     return min(60.0, 60.0 * 400 / n)
 
 
-def animate_opinions(result: SimulationResult, out_path: str | Path, fps: int = 8) -> None:
-    fig, ax = plt.subplots(figsize=(7, 6))
-    _draw_network_edges(ax, result.locations, result.graph)
-
-    scatter = ax.scatter(
-        result.locations[:, 0],
-        result.locations[:, 1],
-        c=result.opinion_history[0],
-        cmap="RdYlGn",
-        vmin=0,
-        vmax=1,
-        s=_marker_size(len(result.locations)),
-        edgecolors="black",
-        linewidths=0.4 if len(result.locations) <= 1000 else 0.0,
-        zorder=2,
-    )
-    cbar = fig.colorbar(scatter, ax=ax)
-    cbar.set_label("Opinion of heat pumps")
-    title = ax.set_title("Opinion evolution — t=0")
-    ax.set_xlabel("x")
-    ax.set_ylabel("y")
-
-    def update(frame):
-        scatter.set_array(result.opinion_history[frame])
-        title.set_text(f"Opinion evolution — t={frame}")
-        return scatter, title
-
-    anim = FuncAnimation(fig, update, frames=len(result.opinion_history), blit=False)
-    anim.save(out_path, writer=PillowWriter(fps=fps))
-    plt.close(fig)
+def _ownership_colours(result: SimulationResult, t: int) -> np.ndarray:
+    h = result.history
+    category = np.where(h.eligible, 1, 0)
+    category = np.where(h.owner[t], 2, category)
+    category = np.where(h.dissatisfied[t], 3, category)
+    return np.array([colour for _, colour in OWNERSHIP])[category]
 
 
-def animate_heatpumps(result: SimulationResult, out_path: str | Path, fps: int = 8) -> None:
-    fig, ax = plt.subplots(figsize=(7, 6))
-    _draw_network_edges(ax, result.locations, result.graph)
+def animate(result: SimulationResult, out_path: str | Path, fps: int = 8, every_months: int = 3) -> None:
+    """Motivation and ownership panels, stepping through the same month
+    together, one frame per `every_months` months."""
+    h = result.history
+    n = len(result.locations)
+    frames = list(range(0, len(h.owner), every_months))
+    if frames[-1] != len(h.owner) - 1:
+        frames.append(len(h.owner) - 1)
+    scatter_kw = dict(s=_marker_size(n), edgecolors="black", linewidths=0.4 if n <= 1000 else 0.0, zorder=2)
 
-    colors = np.where(result.heatpump_history[0], "#1f77b4", "#d3d3d3")
-    scatter = ax.scatter(
-        result.locations[:, 0],
-        result.locations[:, 1],
-        c=colors,
-        s=_marker_size(len(result.locations)),
-        edgecolors="black",
-        linewidths=0.4 if len(result.locations) <= 1000 else 0.0,
-        zorder=2,
-    )
-    title = ax.set_title("Heat pump adoption — t=0")
-    ax.set_xlabel("x")
-    ax.set_ylabel("y")
+    fig, (ax_m, ax_o) = plt.subplots(1, 2, figsize=(13, 6))
+    x, y = result.locations[:, 0], result.locations[:, 1]
 
-    handles = [
-        plt.Line2D([0], [0], marker="o", color="w", markerfacecolor="#1f77b4", markersize=9, label="Has heat pump"),
-        plt.Line2D([0], [0], marker="o", color="w", markerfacecolor="#d3d3d3", markersize=9, label="No heat pump"),
-    ]
-    ax.legend(handles=handles, loc="upper right")
+    _draw_network_edges(ax_m, result.locations, result.graph)
+    m_scatter = ax_m.scatter(x, y, c=h.motivation[0], cmap="RdYlGn", vmin=0, vmax=1, **scatter_kw)
+    fig.colorbar(m_scatter, ax=ax_m).set_label("Motivation to adopt")
+    ax_m.set_title("Motivation")
 
-    def update(frame):
-        colors = np.where(result.heatpump_history[frame], "#1f77b4", "#d3d3d3")
-        scatter.set_facecolor(colors)
-        title.set_text(f"Heat pump adoption — t={frame}")
-        return scatter, title
+    _draw_network_edges(ax_o, result.locations, result.graph)
+    o_scatter = ax_o.scatter(x, y, c=_ownership_colours(result, 0), **scatter_kw)
+    ax_o.set_title("Heat pump ownership")
+    ax_o.legend(handles=[plt.Line2D([0], [0], marker="o", color="w", markerfacecolor=c, markersize=9, label=label)
+                         for label, c in OWNERSHIP], loc="upper right", fontsize=8)
 
-    anim = FuncAnimation(fig, update, frames=len(result.heatpump_history), blit=False)
-    anim.save(out_path, writer=PillowWriter(fps=fps))
-    plt.close(fig)
+    for ax in (ax_m, ax_o):
+        ax.set_xlabel("x")
+        ax.set_ylabel("y")
+    suptitle = fig.suptitle("Month 0", fontsize=14)
 
+    def update(t):
+        m_scatter.set_array(h.motivation[t])
+        o_scatter.set_facecolor(_ownership_colours(result, t))
+        suptitle.set_text(f"Month {t} (year {t / 12:.1f}): {100 * h.owner[t].mean():.1f}% own a heat pump")
+        return m_scatter, o_scatter, suptitle
 
-def animate_combined(result: SimulationResult, out_path: str | Path, fps: int = 8) -> None:
-    """Opinion and heat-pump-adoption panels side by side, stepping through
-    the same timestep together."""
-    fig, (ax_op, ax_hp) = plt.subplots(1, 2, figsize=(13, 6))
-
-    _draw_network_edges(ax_op, result.locations, result.graph)
-    op_scatter = ax_op.scatter(
-        result.locations[:, 0],
-        result.locations[:, 1],
-        c=result.opinion_history[0],
-        cmap="RdYlGn",
-        vmin=0,
-        vmax=1,
-        s=_marker_size(len(result.locations)),
-        edgecolors="black",
-        linewidths=0.4 if len(result.locations) <= 1000 else 0.0,
-        zorder=2,
-    )
-    cbar = fig.colorbar(op_scatter, ax=ax_op)
-    cbar.set_label("Opinion of heat pumps")
-    op_title = ax_op.set_title("Opinion")
-    ax_op.set_xlabel("x")
-    ax_op.set_ylabel("y")
-
-    _draw_network_edges(ax_hp, result.locations, result.graph)
-    hp_colors = np.where(result.heatpump_history[0], "#1f77b4", "#d3d3d3")
-    hp_scatter = ax_hp.scatter(
-        result.locations[:, 0],
-        result.locations[:, 1],
-        c=hp_colors,
-        s=_marker_size(len(result.locations)),
-        edgecolors="black",
-        linewidths=0.4 if len(result.locations) <= 1000 else 0.0,
-        zorder=2,
-    )
-    hp_title = ax_hp.set_title("Heat pump adoption")
-    ax_hp.set_xlabel("x")
-    ax_hp.set_ylabel("y")
-    handles = [
-        plt.Line2D([0], [0], marker="o", color="w", markerfacecolor="#1f77b4", markersize=9, label="Has heat pump"),
-        plt.Line2D([0], [0], marker="o", color="w", markerfacecolor="#d3d3d3", markersize=9, label="No heat pump"),
-    ]
-    ax_hp.legend(handles=handles, loc="upper right")
-
-    suptitle = fig.suptitle("t=0", fontsize=14)
-
-    def update(frame):
-        op_scatter.set_array(result.opinion_history[frame])
-        hp_scatter.set_facecolor(np.where(result.heatpump_history[frame], "#1f77b4", "#d3d3d3"))
-        suptitle.set_text(f"t={frame}")
-        return op_scatter, hp_scatter, suptitle
-
-    anim = FuncAnimation(fig, update, frames=len(result.opinion_history), blit=False)
+    anim = FuncAnimation(fig, update, frames=frames, blit=False)
     fig.tight_layout(rect=[0, 0, 1, 0.95])
     anim.save(out_path, writer=PillowWriter(fps=fps))
     plt.close(fig)

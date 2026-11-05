@@ -1,5 +1,18 @@
 # Results tables
 
+> **Since November 2026** the scripts below have been removed. The
+> prototype mechanism (`proto3.py` without option C) is now the model in
+> `heatpump_sim/`, and reproduces `proto3.py` run for run; the old model and
+> these scripts are at commit `88b8102` on `negative-wom-exploration`
+> (`git checkout 88b8102 -- analysis/negative_wom` to run them). Settings map
+> as: `q` → `dissatisfaction.share`, `w` → `dissatisfaction.weight`,
+> `duration` → `dissatisfaction.duration_months`, `delta` →
+> `word_of_mouth.message_strength`, `m0_mean` → `motivation.baseline_mean`,
+> `beta` → `word_of_mouth.complex_contagion_beta`, `b` →
+> `word_of_mouth.similar_home_credibility`, `trigger` → `adoption.trigger_rate`,
+> `m50` → `adoption.half_point`, `gate` → `adoption.capability_gate`, and the
+> "rewired" layout → `network.rewire: true`.
+
 These are condensed from the report output of each script, run in early October 2026. The raw CSVs go to `results/negative_wom/`, which is gitignored, so they are not committed. Rerun the command shown to regenerate a table.
 
 ## Contents

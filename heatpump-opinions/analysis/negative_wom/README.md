@@ -1,5 +1,18 @@
 # Negative word of mouth: exploration (Oct 2026)
 
+> **Since November 2026** the scripts below have been removed. The
+> prototype mechanism (`proto3.py` without option C) is now the model in
+> `heatpump_sim/`, and reproduces `proto3.py` run for run; the old model and
+> these scripts are at commit `88b8102` on `negative-wom-exploration`
+> (`git checkout 88b8102 -- analysis/negative_wom` to run them). Settings map
+> as: `q` → `dissatisfaction.share`, `w` → `dissatisfaction.weight`,
+> `duration` → `dissatisfaction.duration_months`, `delta` →
+> `word_of_mouth.message_strength`, `m0_mean` → `motivation.baseline_mean`,
+> `beta` → `word_of_mouth.complex_contagion_beta`, `b` →
+> `word_of_mouth.similar_home_credibility`, `trigger` → `adoption.trigger_rate`,
+> `m50` → `adoption.half_point`, `gate` → `adoption.capability_gate`, and the
+> "rewired" layout → `network.rewire: true`.
+
 Exploratory work since `main` at `a9f6116`, which uses the spatial_kernel network and 694 households per cell. Nothing in `heatpump_sim/` or `settings.yaml` is changed: the scripts here wrap or replace the dynamics outside the model code. All parameter values are placeholders. This is for discussion, not a proposal to merge model changes.
 
 ## What we tried

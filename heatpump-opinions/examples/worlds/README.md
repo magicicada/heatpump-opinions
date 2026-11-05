@@ -31,7 +31,7 @@ those households sit relative to one another:
 
 | | `segregated_town` | `mixed_town` |
 |---|---|---|
-| correlation of `characteristic` with position across town | **+0.74** | **+0.02** |
+| correlation of `characteristic` with position across town | **+0.69** | **+0.00** |
 
 That is the "how segregated is this town" axis from the 13 Aug discussion —
 whether rich and poor neighbourhoods sit in separate blocks or alternate
@@ -39,11 +39,12 @@ street by street — isolated from every other difference. Running the same
 simulation settings against both is the cleanest way to ask whether spatial
 segregation changes adoption dynamics on its own.
 
-A note on the seed: `30` was chosen because its `mixing: 1.0` layout is
+A note on the seed: `20` was chosen because its `mixing: 1.0` layout is
 *typical* of a random one (correlation ≈ 0, the expected value) rather than
 an unlucky draw that still looks gradient-ish. Random layouts vary a fair
-amount seed to seed (sd ≈ 0.24), so for any real result sweep seeds rather
-than relying on one pair.
+amount seed to seed (sd ≈ 0.21 over 60 seeds), so for any real result sweep
+seeds rather than relying on one pair. (Before the switch to the six LSOA
+types the pair used seed 30, which is no longer typical.)
 
 ## Regenerating
 
@@ -53,12 +54,14 @@ change, so the examples do not drift from the current model.
 
 ```bash
 python3 generate_world.py --out examples/worlds/tiny_demo.csv        --n-households 40  --grid 2 2 --seed 1  --mixing 0.3
-python3 generate_world.py --out examples/worlds/segregated_town.csv  --n-households 200 --grid 4 4 --seed 30 --mixing 0.0
-python3 generate_world.py --out examples/worlds/mixed_town.csv       --n-households 200 --grid 4 4 --seed 30 --mixing 1.0
+python3 generate_world.py --out examples/worlds/segregated_town.csv  --n-households 200 --grid 4 4 --seed 20 --mixing 0.0
+python3 generate_world.py --out examples/worlds/mixed_town.csv       --n-households 200 --grid 4 4 --seed 20 --mixing 1.0
 ```
 
-The archetype and capability values these were built from are placeholders
-standing in for real LSOA data — see the warnings in `settings.yaml`.
+The archetypes are the six LSOA types derived from national data
+(`analysis/derive_archetypes.py`); the capability scores that turn tenure,
+building type and income into `characteristic` are still placeholders — see
+`settings.yaml`.
 
 ## LSOA-scale worlds
 
@@ -73,11 +76,12 @@ are not committed; generate them into the gitignored `worlds/`:
 
 ```bash
 python3 generate_world.py --out worlds/model_town.csv
-python3 generate_world.py --out worlds/segregated_town_lsoa.csv --seed 30 --mixing 0.0
-python3 generate_world.py --out worlds/mixed_town_lsoa.csv      --seed 30 --mixing 1.0
+python3 generate_world.py --out worlds/segregated_town_lsoa.csv --seed 20 --mixing 0.0
+python3 generate_world.py --out worlds/mixed_town_lsoa.csv      --seed 20 --mixing 1.0
 ```
 
 The pair again shares coordinates, so it pairs as tightly as the small one.
-Correlation of `characteristic` with position across town is +0.73 for the
-segregated world and +0.09 for the mixed one. A single run takes about 30 s
-with `--no-animations`; rendering the GIFs adds several minutes.
+Correlation of `characteristic` with position across town is +0.71 for the
+segregated world and +0.00 for the mixed one. A single 25-year run takes
+about 20 s with `--no-animations`, most of it building the network and
+saving the history; rendering the animation adds a few minutes.
